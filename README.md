@@ -45,6 +45,7 @@ A Platform for **Evolutionary Computation** + **Large Language Model** for autom
 
 ---
 ## News 🔥 
++ 2025.6 🎉🎉 We're excited to share that **EoH** recently set a **New World Record in Circle Packing Problem**, achieving a score of 2.63594 for 26 circles !  [Results here](https://github.com/Optima-CityU/llm4ad/tree/main/example/circle_packing)
 + 2024.10.30, Survey Paper [A Systematic Survey on Large Language Models for Algorithm Design](https://arxiv.org/pdf/2410.14716) has been uploaded to Arxiv ! 🎉
 + 2024.5.31, [Evolve Cost-aware Acquisition Functions Using Large Language Models](https://arxiv.org/abs/2404.16906) has been accepted at **PPSN 2024 (Best Paper Nomination)** ! 🎉
 + 2024.5.31, [Understanding the Importance of Evolutionary Search in Automated Heuristic Design with Large Language Models](https://arxiv.org/pdf/2407.10873) has been accepted at **PPSN 2024**! 🎉
