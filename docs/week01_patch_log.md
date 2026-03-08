@@ -276,6 +276,22 @@ The purpose of this log is to prevent silent drift.
   - this only changes notebook-side visibility of progress
   - it does not change the runner, config, search loop, evaluator, or selection behavior
 
+### 17. HPC LLM capability benchmark
+
+- File: [benchmark_hpc_llm.py](C:/Users/pc%20omen/Documents/experimentation/EoH/scripts/benchmark_hpc_llm.py)
+- Behavior added:
+  - benchmarks `/models` reachability
+  - benchmarks chat-completion latency at configurable concurrency levels
+  - tests three prompt types:
+    - short ping
+    - medium bin-packing prompt
+    - actual `bp_online` EOH-style `i1` prompt
+  - writes structured benchmark output under `benchmark_results/`
+- Why baseline-safe:
+  - this script is diagnostic only
+  - it does not change S0 search code or baseline configs
+  - it is intended to justify runtime-envelope calibration decisions for the HPC deployment
+
 ## Risks Still Open
 
 - The S0 runner is not yet unified. The upstream example script is still the active launcher.
