@@ -133,13 +133,24 @@ def trace_online_binpack(problem, items, capacity, alg, max_steps):
     trace = []
     for step_index, item in enumerate(items[:max_steps]):
         valid_bin_indices = problem.get_valid_bin_indices(item, bins)
+        valid_bins = bins[valid_bin_indices]
+        unique_capacities, counts = np.unique(valid_bins, return_counts=True)
+        chosen_capacity_group_size = 1
         priorities = alg.score(item, bins[valid_bin_indices])
         best_bin = valid_bin_indices[np.argmax(priorities)]
+        chosen_capacity = bins[best_bin]
+        chosen_capacity_matches = counts[unique_capacities == chosen_capacity]
+        if len(chosen_capacity_matches) > 0:
+            chosen_capacity_group_size = int(chosen_capacity_matches[0])
         trace.append(
             {
                 "step_index": int(step_index),
                 "item": int(item),
                 "valid_bin_count": int(len(valid_bin_indices)),
+                "unique_capacity_count": int(len(unique_capacities)),
+                "duplicate_capacity_count": int(len(valid_bin_indices) - len(unique_capacities)),
+                "max_equal_capacity_group_size": int(np.max(counts)),
+                "chosen_capacity_group_size": chosen_capacity_group_size,
                 "chosen_bin_index": int(best_bin),
                 "priority_argmax_index": int(np.argmax(priorities)),
                 "priority_max": float(np.max(priorities)),
@@ -161,10 +172,58 @@ def choice_signature_from_steps(steps):
     ]
 
 
+def analyze_capacity_ties(problem, items, capacity, alg, max_steps=None):
+    bins = np.array([capacity for _ in range(len(items))])
+    steps_to_analyze = items if max_steps is None else items[:max_steps]
+    summary = {
+        "step_count": 0,
+        "steps_with_duplicate_valid_capacities": 0,
+        "steps_with_chosen_capacity_tie": 0,
+        "max_equal_capacity_group_size_observed": 0,
+        "mean_duplicate_capacity_fraction": 0.0,
+        "mean_chosen_capacity_group_size": 0.0,
+    }
+    duplicate_capacity_fractions = []
+    chosen_capacity_group_sizes = []
+
+    for item in steps_to_analyze:
+        valid_bin_indices = problem.get_valid_bin_indices(item, bins)
+        valid_bins = bins[valid_bin_indices]
+        unique_capacities, counts = np.unique(valid_bins, return_counts=True)
+        duplicate_capacity_count = int(len(valid_bin_indices) - len(unique_capacities))
+        max_group_size = int(np.max(counts))
+        priorities = alg.score(item, valid_bins)
+        best_bin = valid_bin_indices[np.argmax(priorities)]
+
+        summary["step_count"] += 1
+        if duplicate_capacity_count > 0:
+            summary["steps_with_duplicate_valid_capacities"] += 1
+        summary["max_equal_capacity_group_size_observed"] = max(
+            summary["max_equal_capacity_group_size_observed"],
+            max_group_size,
+        )
+        duplicate_capacity_fractions.append(duplicate_capacity_count / len(valid_bin_indices))
+
+        chosen_capacity = bins[best_bin]
+        chosen_capacity_group_size = int(counts[unique_capacities == chosen_capacity][0])
+        if chosen_capacity_group_size > 1:
+            summary["steps_with_chosen_capacity_tie"] += 1
+        chosen_capacity_group_sizes.append(chosen_capacity_group_size)
+
+        bins[best_bin] -= item
+
+    if summary["step_count"] > 0:
+        summary["mean_duplicate_capacity_fraction"] = float(np.mean(duplicate_capacity_fractions))
+        summary["mean_chosen_capacity_group_size"] = float(np.mean(chosen_capacity_group_sizes))
+
+    return summary
+
+
 def evaluate_candidate(problem, evaluation_code, trace_steps):
     alg = load_algorithm_module(evaluation_code)
     search_problem_metrics = []
     first_trace = None
+    first_capacity_tie_summary = None
 
     for problem_name, dataset in problem.instances.items():
         instance_bin_counts = []
@@ -186,6 +245,12 @@ def evaluate_candidate(problem, evaluation_code, trace_steps):
                     "instance_id": instance_key,
                     "steps": trace_online_binpack(problem, items, capacity, alg, trace_steps),
                 }
+                first_capacity_tie_summary = {
+                    "problem_name": problem_name,
+                    "instance_id": instance_key,
+                    "full_instance": analyze_capacity_ties(problem, items, capacity, alg, max_steps=None),
+                    "traced_prefix": analyze_capacity_ties(problem, items, capacity, alg, max_steps=trace_steps),
+                }
 
         avg_num_bins = float(np.mean([entry["used_bins"] for entry in instance_bin_counts]))
         lower_bound = float(problem.lb[problem_name])
@@ -203,6 +268,7 @@ def evaluate_candidate(problem, evaluation_code, trace_steps):
     return {
         "problem_metrics": search_problem_metrics,
         "trace": first_trace,
+        "capacity_tie_summary": first_capacity_tie_summary,
     }
 
 

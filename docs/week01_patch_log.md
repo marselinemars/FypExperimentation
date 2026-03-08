@@ -334,6 +334,7 @@ The purpose of this log is to prevent silent drift.
   - this is a post-run diagnostic script only
   - it does not modify prompts, operators, survival, or evaluator behavior during search
   - later refinement adds choice-only trace signatures to distinguish score-scale differences from actual bin-choice differences
+  - later refinement adds equal-capacity tie statistics to quantify symmetry and deterministic tie-breaking pressure in `bp_online`
 
 ## Risks Still Open
 
