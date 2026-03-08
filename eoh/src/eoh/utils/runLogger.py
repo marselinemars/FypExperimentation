@@ -99,11 +99,17 @@ class RunLogger:
         self.prompts_dir = os.path.join(self.logs_dir, "prompts")
         self.responses_dir = os.path.join(self.logs_dir, "responses")
         self.posthoc_dir = os.path.join(self.run_dir, "posthoc_eval")
+        self.behavior_dir = os.path.join(self.run_dir, "behavior")
+        self.behavior_cards_dir = os.path.join(self.behavior_dir, "cards")
+        self.behavior_raw_traces_dir = os.path.join(self.behavior_dir, "raw_traces")
+        self.behavior_generation_summaries_dir = os.path.join(self.behavior_dir, "generation_summaries")
+        self.behavior_cards_index_path = os.path.join(self.behavior_dir, "heuristic_cards_index.jsonl")
 
         self.run_manifest_path = os.path.join(self.run_dir, "run_manifest.json")
         self.candidate_attempts_path = os.path.join(self.logs_dir, "candidate_attempts.jsonl")
         self.invalid_candidates_path = os.path.join(self.logs_dir, "invalid_candidates.jsonl")
         self.run_summary_path = os.path.join(self.run_dir, "run_summary.json")
+        self._behavior_card_index_ids = set()
 
         self.start_time = time.time()
         self.stats = {
@@ -120,6 +126,10 @@ class RunLogger:
             self.prompts_dir,
             self.responses_dir,
             self.posthoc_dir,
+            self.behavior_dir,
+            self.behavior_cards_dir,
+            self.behavior_raw_traces_dir,
+            self.behavior_generation_summaries_dir,
         ]:
             os.makedirs(path, exist_ok=True)
 
@@ -141,6 +151,11 @@ class RunLogger:
                 "invalid_candidates": self.invalid_candidates_path,
                 "run_summary": self.run_summary_path,
                 "posthoc_dir": self.posthoc_dir,
+                "behavior_dir": self.behavior_dir,
+                "behavior_cards": self.behavior_cards_dir,
+                "behavior_raw_traces": self.behavior_raw_traces_dir,
+                "behavior_generation_summaries": self.behavior_generation_summaries_dir,
+                "behavior_cards_index": self.behavior_cards_index_path,
             },
             "paras": _sanitize_paras(paras),
         }
@@ -204,6 +219,37 @@ class RunLogger:
         else:
             self.stats["invalid_candidates"] += 1
             _append_jsonl(self.invalid_candidates_path, record)
+        return record
+
+    def write_heuristic_card(self, card):
+        candidate_id = card["identity"]["candidate_id"]
+        path = os.path.join(self.behavior_cards_dir, f"candidate_{candidate_id}.json")
+        _write_json(path, card)
+        if candidate_id not in self._behavior_card_index_ids:
+            _append_jsonl(
+                self.behavior_cards_index_path,
+                {
+                    "candidate_id": candidate_id,
+                    "generation": card["identity"]["generation"],
+                    "operator": card["identity"]["operator"],
+                    "valid": card["identity"]["valid"],
+                    "objective": card["identity"]["objective"],
+                    "primary_label": card["diagnosis"].get("primary_label"),
+                    "card_path": path,
+                },
+            )
+            self._behavior_card_index_ids.add(candidate_id)
+        return path
+
+    def write_behavior_trace(self, candidate_id, payload):
+        path = os.path.join(self.behavior_raw_traces_dir, f"candidate_{candidate_id}.json")
+        _write_json(path, payload)
+        return path
+
+    def write_generation_behavior_summary(self, generation, summary):
+        path = os.path.join(self.behavior_generation_summaries_dir, f"generation_{int(generation):03d}.json")
+        _write_json(path, summary)
+        return path
 
     def write_summary(self, summary):
         summary = dict(summary)

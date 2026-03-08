@@ -62,6 +62,9 @@ class EOH:
         self.numpy_seed = paras.exp_numpy_seed
         self.worker_seed = paras.exp_worker_seed
         self.logger = getattr(paras, "exp_logger", None)
+        self.behavior_enabled = getattr(paras, "exp_behavior_enabled", False)
+        self.behavior_config_path = getattr(paras, "exp_behavior_config_path", None)
+        self.behavior_system_id = getattr(paras, "exp_behavior_system_id", None)
         self._run_summary = {
             "final_population_size": 0,
             "best_objective": None,
@@ -112,7 +115,10 @@ class EOH:
                                    self.debug_mode, interface_prob, select=self.select,n_p=self.exp_n_proc,
                                    logger=self.logger,
                                    timeout = self.timeout, use_numba=self.use_numba,
-                                   worker_seed_base=self.worker_seed
+                                   worker_seed_base=self.worker_seed,
+                                   behavior_enabled=getattr(self, "behavior_enabled", False),
+                                   behavior_config_path=getattr(self, "behavior_config_path", None),
+                                   behavior_system_id=getattr(self, "behavior_system_id", None),
                                    )
 
         # initialization
@@ -166,6 +172,8 @@ class EOH:
             self._run_summary["failure_stage"] = "initialization"
             self._run_summary["failure_message"] = "Initial population is empty after generation and management."
             raise RuntimeError(self._run_summary["failure_message"])
+        if interface_ec.behavior_pipeline is not None:
+            interface_ec.behavior_pipeline.finalize_generation(0)
 
         # main loop
         n_op = len(self.operators)
@@ -208,6 +216,8 @@ class EOH:
             with open(filename, 'w') as f:
                 json.dump(population, f, indent=5)
             self._run_summary["saved_generation_files"].append(filename)
+            if interface_ec.behavior_pipeline is not None:
+                interface_ec.behavior_pipeline.finalize_generation(pop + 1)
 
             # Save the best one to a file
             if not population:

@@ -64,6 +64,11 @@ reproducibility:
   worker_seed_base: 2024
   worker_seed_strategy: "deterministic_per_attempt_context_hash"
 
+behavior:
+  enabled: true
+  system_id: "S4a"
+  config_path: "configs/behavior_bp_online_v1.yaml"
+
 artifacts:
   output_root: "./"
   run_structure:

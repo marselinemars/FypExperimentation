@@ -42,6 +42,9 @@ class Paras():
         self.exp_python_seed = None
         self.exp_numpy_seed = None
         self.exp_worker_seed = None
+        self.exp_behavior_enabled = False
+        self.exp_behavior_config_path = None
+        self.exp_behavior_system_id = None
         
         #####################
         ###  Evaluation settings  ###

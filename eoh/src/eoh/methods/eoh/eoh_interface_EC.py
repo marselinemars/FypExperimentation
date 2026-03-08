@@ -9,9 +9,10 @@ from .evaluator_accelerate import add_numba_decorator
 import re
 import concurrent.futures
 from ...utils.seeding import derive_seed, set_global_seeds
+from ...behavior import BehaviorPipeline
 
 class InterfaceEC():
-    def __init__(self, pop_size, m, api_endpoint, api_key, llm_model,llm_use_local,llm_local_url, debug_mode, interface_prob, select,n_p,timeout,use_numba, logger=None, worker_seed_base=None, **kwargs):
+    def __init__(self, pop_size, m, api_endpoint, api_key, llm_model,llm_use_local,llm_local_url, debug_mode, interface_prob, select,n_p,timeout,use_numba, logger=None, worker_seed_base=None, behavior_enabled=False, behavior_config_path=None, behavior_system_id=None, **kwargs):
 
         # LLM settings
         self.pop_size = pop_size
@@ -31,6 +32,14 @@ class InterfaceEC():
         self.use_numba = use_numba
         self.logger = logger
         self.worker_seed_base = worker_seed_base
+        self.behavior_pipeline = None
+        if behavior_enabled and logger is not None and interface_prob.__class__.__name__ == "BPONLINE":
+            self.behavior_pipeline = BehaviorPipeline(
+                interface_prob,
+                logger,
+                config_path=behavior_config_path,
+                system_id=behavior_system_id or "S4a",
+            )
 
     def _text_hash(self, value):
         if value is None:
@@ -350,7 +359,9 @@ class InterfaceEC():
             out_p.append(p)
             out_off.append(off)
             if self.logger is not None:
-                self.logger.log_candidate_attempt(log_record)
+                persisted_record = self.logger.log_candidate_attempt(log_record)
+                if self.behavior_pipeline is not None:
+                    self.behavior_pipeline.analyze_and_log_candidate(persisted_record, off)
             if self.debug:
                 print(f">>> check offsprings: \n {off}")
         return out_p, out_off

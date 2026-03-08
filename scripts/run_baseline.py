@@ -64,6 +64,7 @@ def build_paras(config, config_path, strict_llm=True):
     evaluation = config.get("evaluation", {})
     artifacts = config.get("artifacts", {})
     reproducibility = config.get("reproducibility", {})
+    behavior = config.get("behavior", {})
 
     llm_settings = resolve_llm_settings(config.get("llm", {}), strict=strict_llm)
 
@@ -102,6 +103,9 @@ def build_paras(config, config_path, strict_llm=True):
     paras.exp_prompts_path = resolve_repo_path(problem.get("prompts"))
     paras.exp_seed_policy = reproducibility.get("mode")
     paras.exp_worker_seed_strategy = reproducibility.get("worker_seed_strategy")
+    paras.exp_behavior_enabled = behavior.get("enabled", False)
+    paras.exp_behavior_config_path = resolve_repo_path(behavior.get("config_path"))
+    paras.exp_behavior_system_id = behavior.get("system_id")
     return paras
 
 
@@ -261,6 +265,8 @@ def main():
                 "llm_use_local": paras.llm_use_local,
                 "llm_api_endpoint": paras.llm_api_endpoint,
                 "llm_model": paras.llm_model,
+                "behavior_enabled": paras.exp_behavior_enabled,
+                "behavior_config_path": paras.exp_behavior_config_path,
             },
             indent=2,
         ))
