@@ -11,6 +11,7 @@ class BPONLINE():
         getdate = GetData()
         self.instances, self.lb = getdate.get_instances()
         self.prompts = GetPrompts()
+        self.last_evaluation_error = None
 
     def get_valid_bin_indices(self,item: float, bins: np.ndarray) -> np.ndarray:
         """Returns indices of bins in which item can fit."""
@@ -103,6 +104,7 @@ class BPONLINE():
     #         return None
         
     def evaluate(self, code_string):
+        self.last_evaluation_error = None
         try:
             # Suppress warnings
             with warnings.catch_warnings():
@@ -121,7 +123,10 @@ class BPONLINE():
 
                 return fitness
         except Exception as e:
-            #print("Error:", str(e))
+            self.last_evaluation_error = {
+                "type": type(e).__name__,
+                "message": str(e),
+            }
             return None
 
 

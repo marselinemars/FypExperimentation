@@ -308,6 +308,32 @@ The purpose of this log is to prevent silent drift.
   - the HPC benchmark showed the original `20` second timeout is incompatible with the deployed model latency
   - the failure-handling change does not alter search logic; it only turns an opaque crash into a diagnosable failed run artifact
 
+### 19. BP evaluator exception-detail logging
+
+- File: [run.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/problems/optimization/bp_online/run.py)
+- File: [eoh_interface_EC.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/methods/eoh/eoh_interface_EC.py)
+- Behavior added:
+  - `BPONLINE.evaluate` now stores the underlying evaluation exception type and message before returning `None`
+  - candidate logging now surfaces that stored evaluator exception in `candidate_attempts.jsonl` and `invalid_candidates.jsonl`
+  - invalid candidates still keep `objective = None`
+- Why baseline-safe:
+  - scoring semantics are unchanged
+  - invalid candidates are still discarded exactly as before
+  - the patch only improves failure attribution for thesis analysis and debugging
+
+### 20. BP-online candidate behavior diagnostic
+
+- File: [analyze_bp_online_run.py](C:/Users/pc%20omen/Documents/experimentation/EoH/scripts/analyze_bp_online_run.py)
+- Behavior added:
+  - loads valid candidates from a completed run
+  - reconstructs candidate code from the archived LLM responses
+  - reevaluates candidates on the `bp_online` search instances
+  - reports per-instance used-bin counts and early placement traces
+  - saves a diagnostic JSON file under the run folder
+- Why baseline-safe:
+  - this is a post-run diagnostic script only
+  - it does not modify prompts, operators, survival, or evaluator behavior during search
+
 ## Risks Still Open
 
 - The S0 runner is not yet unified. The upstream example script is still the active launcher.

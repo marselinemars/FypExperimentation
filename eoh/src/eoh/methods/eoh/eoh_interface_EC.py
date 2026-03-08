@@ -37,6 +37,15 @@ class InterfaceEC():
             return None
         return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
+    def _get_evaluation_error(self):
+        evaluation_error = getattr(self.interface_eval, "last_evaluation_error", None)
+        if isinstance(evaluation_error, dict):
+            return {
+                "type": evaluation_error.get("type"),
+                "message": evaluation_error.get("message"),
+            }
+        return None
+
     def _summarize_parent(self, parent):
         if parent is None:
             return None
@@ -263,6 +272,13 @@ class InterfaceEC():
                 future = executor.submit(self.interface_eval.evaluate, code)
                 fitness = future.result(timeout=self.timeout)
                 if fitness is None:
+                    evaluation_error = self._get_evaluation_error()
+                    if evaluation_error is not None:
+                        log_record["error_type"] = evaluation_error.get("type")
+                        log_record["error_message"] = evaluation_error.get("message")
+                    else:
+                        log_record["error_type"] = "ValueError"
+                        log_record["error_message"] = "candidate evaluation returned None"
                     raise ValueError("candidate evaluation returned None")
                 offspring['objective'] = np.round(fitness, 5)
                 future.cancel()        
@@ -273,8 +289,10 @@ class InterfaceEC():
 
 
         except Exception as e:
-            log_record["error_type"] = type(e).__name__
-            log_record["error_message"] = str(e)
+            if log_record["error_type"] is None:
+                log_record["error_type"] = type(e).__name__
+            if log_record["error_message"] is None:
+                log_record["error_message"] = str(e)
 
             offspring = {
                 'algorithm': None,
