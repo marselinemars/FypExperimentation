@@ -265,6 +265,17 @@ The purpose of this log is to prevent silent drift.
   - the frozen baseline config remains unchanged
   - the prebaseline config is explicitly documented as a non-baseline diagnostic stage
 
+### 16. Live notebook subprocess output
+
+- File: [s0_bp_online_runner.ipynb](C:/Users/pc%20omen/Documents/experimentation/EoH/notebooks/s0_bp_online_runner.ipynb)
+- Behavior added:
+  - changed notebook subprocess execution from buffered `subprocess.run(..., capture_output=True)` to streamed `subprocess.Popen(...)`
+  - enables `PYTHONUNBUFFERED=1` for the child process
+  - prints runner output live as lines arrive
+- Why baseline-safe:
+  - this only changes notebook-side visibility of progress
+  - it does not change the runner, config, search loop, evaluator, or selection behavior
+
 ## Risks Still Open
 
 - The S0 runner is not yet unified. The upstream example script is still the active launcher.
