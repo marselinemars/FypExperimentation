@@ -47,6 +47,25 @@ The S0 runner reads the versioned config file and is intended to replace the exa
 - `eva_timeout = 20` for `bp_online` via [getParas.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/utils/getParas.py)
 - `eva_numba_decorator = True` for `bp_online` via [getParas.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/utils/getParas.py)
 
+## S0 Comparability Position
+
+The frozen S0 baseline preserves the original EOH `bp_online` search structure from the upstream example:
+
+- `population_size = 4`
+- `n_populations = 4`
+- `parallel_workers = 4`
+- `operators = ["e1", "e2", "m1", "m2"]`
+- `selection = "prob_rank"`
+- `management = "pop_greedy"`
+- `n_parents_e1_e2 = 2`
+- `use_numba_decorator = true`
+
+The only runtime-envelope calibration currently applied for the HPC deployment is:
+
+- `timeout_seconds = 240`
+
+This calibration is required because the deployed HPC model latency is much higher than the upstream `bp_online` timeout assumption of `20` seconds.
+
 ## Frozen S0 Execution Environment
 
 - Intended execution environment: JupyterLab running on the school HPC platform

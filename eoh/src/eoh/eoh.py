@@ -57,17 +57,28 @@ class EVOL:
         )
         self.logger.write_manifest(manifest)
 
-        method.run()
-
         summary = {
             "problem_class": problem.__class__.__name__ if problem is not None else None,
             "method_class": method.__class__.__name__ if method is not None else None,
             "results_dir": self.paras.exp_output_path,
+            "run_status": "completed",
+            "error_type": None,
+            "error_message": None,
         }
+
+        try:
+            method.run()
+        except Exception as exc:
+            summary["run_status"] = "failed"
+            summary["error_type"] = type(exc).__name__
+            summary["error_message"] = str(exc)
+            if hasattr(method, "get_run_summary"):
+                summary.update(method.get_run_summary())
+            self.logger.write_summary(summary)
+            raise
 
         if hasattr(method, "get_run_summary"):
             summary.update(method.get_run_summary())
-
         self.logger.write_summary(summary)
 
         print("> End of Evolution! ")

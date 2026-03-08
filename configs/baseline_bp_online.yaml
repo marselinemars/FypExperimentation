@@ -37,7 +37,7 @@ search:
   debug_mode: false
 
 evaluation:
-  timeout_seconds: 20
+  timeout_seconds: 240
   use_numba_decorator: true
   search_objective: "minimize excess over L1 lower bound on bp_online search dataset"
   invalid_candidate_definition:
@@ -82,3 +82,4 @@ notes:
   - "Do not change values here silently once the first real S0 run is executed."
   - "S0 now freezes explicit Python, NumPy, and worker seed plumbing."
   - "The API key is intentionally not stored in versioned config because the runner snapshots this file into the run directory."
+  - "S0 preserves the original EOH bp_online search structure but uses an HPC-calibrated timeout."

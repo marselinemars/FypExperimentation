@@ -77,8 +77,10 @@ These are the currently frozen search settings from the S0 config:
 - `operator_weights = [1, 1, 1, 1]`
 - `parallel_workers = 4`
 - `debug_mode = false`
-- `timeout_seconds = 20`
+- `timeout_seconds = 240`
 - `use_numba_decorator = true`
+
+The S0 baseline keeps the original EOH `bp_online` search structure and uses an HPC-calibrated timeout only.
 
 ## Diagnostic Progression Before S0
 
@@ -101,7 +103,7 @@ The current execution progression is explicitly staged:
    - `population_size = 4`
    - `n_populations = 4`
    - `parallel_workers = 4`
-   - `timeout_seconds = 20`
+   - `timeout_seconds = 240`
 
 The first two stages are diagnostic and scale-up stages only. They are not thesis baseline result settings.
 

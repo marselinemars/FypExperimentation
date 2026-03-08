@@ -292,6 +292,22 @@ The purpose of this log is to prevent silent drift.
   - it does not change S0 search code or baseline configs
   - it is intended to justify runtime-envelope calibration decisions for the HPC deployment
 
+### 18. HPC-calibrated baseline timeout and empty-population failure handling
+
+- File: [baseline_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/baseline_bp_online.yaml)
+- File: [eoh.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/eoh.py)
+- File: [eoh.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/methods/eoh/eoh.py)
+- File: [week01_frozen_baseline.md](C:/Users/pc%20omen/Documents/experimentation/EoH/docs/week01_frozen_baseline.md)
+- File: [week01_protocol_s0.md](C:/Users/pc%20omen/Documents/experimentation/EoH/docs/week01_protocol_s0.md)
+- Behavior added:
+  - changed the frozen S0 `bp_online` timeout from `20` to `240` seconds
+  - documented that S0 preserves the original EOH search structure and calibrates only the timeout for the HPC deployment
+  - replaced the empty-population `IndexError` path with an explicit runtime failure message
+  - writes failed run summaries with `run_status`, `error_type`, and `error_message`
+- Why this belongs in S0:
+  - the HPC benchmark showed the original `20` second timeout is incompatible with the deployed model latency
+  - the failure-handling change does not alter search logic; it only turns an opaque crash into a diagnosable failed run artifact
+
 ## Risks Still Open
 
 - The S0 runner is not yet unified. The upstream example script is still the active launcher.

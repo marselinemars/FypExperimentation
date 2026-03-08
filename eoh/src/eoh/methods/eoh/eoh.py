@@ -69,6 +69,9 @@ class EOH:
             "best_algorithm": None,
             "saved_generation_files": [],
             "saved_best_files": [],
+            "run_status": "completed",
+            "failure_stage": None,
+            "failure_message": None,
             "seed_summary": {
                 "python_seed": self.python_seed,
                 "numpy_seed": self.numpy_seed,
@@ -158,6 +161,12 @@ class EOH:
                     json.dump(population, f, indent=5)
                 n_start = 0
 
+        if not population:
+            self._run_summary["run_status"] = "failed"
+            self._run_summary["failure_stage"] = "initialization"
+            self._run_summary["failure_message"] = "Initial population is empty after generation and management."
+            raise RuntimeError(self._run_summary["failure_message"])
+
         # main loop
         n_op = len(self.operators)
 
@@ -201,6 +210,11 @@ class EOH:
             self._run_summary["saved_generation_files"].append(filename)
 
             # Save the best one to a file
+            if not population:
+                self._run_summary["run_status"] = "failed"
+                self._run_summary["failure_stage"] = f"population_generation_{pop + 1}"
+                self._run_summary["failure_message"] = "Population became empty before saving the best candidate."
+                raise RuntimeError(self._run_summary["failure_message"])
             filename = self.output_path + "/results/pops_best/population_generation_" + str(pop + 1) + ".json"
             with open(filename, 'w') as f:
                 json.dump(population[0], f, indent=5)
