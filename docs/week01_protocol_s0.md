@@ -80,6 +80,31 @@ These are the currently frozen search settings from the S0 config:
 - `timeout_seconds = 20`
 - `use_numba_decorator = true`
 
+## Diagnostic Progression Before S0
+
+The current execution progression is explicitly staged:
+
+1. Smoke diagnostic:
+   - [smoke_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/smoke_bp_online.yaml)
+   - `population_size = 2`
+   - `n_populations = 1`
+   - `parallel_workers = 1`
+   - `timeout_seconds = 180`
+2. Prebaseline scale-up:
+   - [prebaseline_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/prebaseline_bp_online.yaml)
+   - `population_size = 4`
+   - `n_populations = 1`
+   - `parallel_workers = 1`
+   - `timeout_seconds = 180`
+3. Frozen S0 baseline:
+   - [baseline_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/baseline_bp_online.yaml)
+   - `population_size = 4`
+   - `n_populations = 4`
+   - `parallel_workers = 4`
+   - `timeout_seconds = 20`
+
+The first two stages are diagnostic and scale-up stages only. They are not thesis baseline result settings.
+
 ## Fixed Operator Set and Order
 
 Operator order in S0:

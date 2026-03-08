@@ -1,0 +1,83 @@
+baseline:
+  name: "S0_prebaseline_scaleup_bp_online"
+  status: "intermediate_scaleup_not_for_final_baseline_results"
+  upstream_repo: "https://github.com/FeiLiu36/EoH.git"
+  upstream_commit: "492782aefe03bade9eba621d0a43f5652c7c7202"
+  local_repo_root: "C:/Users/pc omen/Documents/experimentation/EoH"
+
+problem:
+  name: "bp_online"
+  search_evaluator: "eoh/src/eoh/problems/optimization/bp_online/run.py"
+  search_dataset_source: "eoh/src/eoh/problems/optimization/bp_online/get_instance.py"
+  prompts: "eoh/src/eoh/problems/optimization/bp_online/prompts.py"
+  posthoc_eval_script: "examples/bp_online/evaluation/runEval.py"
+
+launcher:
+  current_entry_script: "examples/bp_online/runEoH.py"
+  planned_unified_runner: "scripts/run_baseline.py"
+
+search:
+  method: "eoh"
+  selection: "prob_rank"
+  management: "pop_greedy"
+  population_size: 4
+  n_populations: 1
+  n_parents_e1_e2: 2
+  operators:
+    - "e1"
+    - "e2"
+    - "m1"
+    - "m2"
+  operator_weights:
+    - 1
+    - 1
+    - 1
+    - 1
+  parallel_workers: 1
+  debug_mode: false
+
+evaluation:
+  timeout_seconds: 180
+  use_numba_decorator: true
+  search_objective: "intermediate scale-up configuration between smoke and frozen S0 baseline"
+  invalid_candidate_definition:
+    - "LLM response cannot be parsed into algorithm and code"
+    - "generated code raises during exec"
+    - "generated code raises during evaluation"
+    - "evaluation returns None"
+
+llm:
+  use_local: false
+  api_endpoint: "http://vllm-nodeport.vllm-ns.svc.cluster.local:8000/v1"
+  api_key: "SET_VIA_ENV_EOH_LLM_API_KEY"
+  model: "Qwen3.5-122B-A10B-FP8"
+  sampling:
+    temperature: "BACKEND_DEFAULT_OR_UNEXPOSED"
+    top_p: "BACKEND_DEFAULT_OR_UNEXPOSED"
+    seed: "BACKEND_DEFAULT_OR_UNEXPOSED"
+
+reproducibility:
+  mode: "seeded_controlled_s0_prebaseline"
+  global_seed: 2024
+  python_seed: 2024
+  numpy_seed: 2024
+  worker_seed_base: 2024
+  worker_seed_strategy: "deterministic_per_attempt_context_hash"
+
+artifacts:
+  output_root: "./"
+  run_structure:
+    run_manifest: "runs/<run_id>/run_manifest.json"
+    run_summary: "runs/<run_id>/run_summary.json"
+    candidate_attempts: "runs/<run_id>/logs/candidate_attempts.jsonl"
+    invalid_candidates: "runs/<run_id>/logs/invalid_candidates.jsonl"
+    prompts: "runs/<run_id>/logs/prompts/"
+    responses: "runs/<run_id>/logs/responses/"
+    search_populations: "runs/<run_id>/results/pops/"
+    search_best: "runs/<run_id>/results/pops_best/"
+    posthoc_eval: "runs/<run_id>/posthoc_eval/bp_online/"
+
+notes:
+  - "This config is an intermediate scale-up step between smoke and frozen S0 baseline."
+  - "Use it to diagnose throughput and invalid-rate behavior before running the full baseline config."
+  - "Do not use runs from this config as thesis baseline results."

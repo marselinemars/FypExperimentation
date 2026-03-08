@@ -99,5 +99,20 @@ Recommended wording:
 ## Immediate Next Actions
 
 1. Finalize any exposed backend sampling parameters.
-2. Run the first smoke test from the HPC Jupyter environment.
-3. Run one smoke test and verify artifact completeness under a unique run directory.
+2. Use the smoke config to verify end-to-end pipeline health.
+3. Use the prebaseline config to test a controlled scale-up before full S0.
+4. Run the frozen baseline config only after smoke and prebaseline pass.
+
+## Scale-Up Ladder
+
+To avoid contaminating S0 while still diagnosing pipeline limits, the current intended progression is:
+
+1. Smoke diagnostic:
+   - [smoke_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/smoke_bp_online.yaml)
+   - purpose: prove end-to-end pipeline viability under reduced load
+2. Prebaseline scale-up:
+   - [prebaseline_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/prebaseline_bp_online.yaml)
+   - purpose: test near-baseline search shape with reduced concurrency pressure
+3. Frozen S0 baseline:
+   - [baseline_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/baseline_bp_online.yaml)
+   - purpose: produce baseline results for thesis comparison
