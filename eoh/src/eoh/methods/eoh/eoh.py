@@ -4,6 +4,7 @@ import random
 import time
 
 from .eoh_interface_EC import InterfaceEC
+from ...utils.seeding import set_global_seeds
 # main class for eoh
 class EOH:
 
@@ -57,11 +58,28 @@ class EOH:
         self.timeout = paras.eva_timeout
 
         self.use_numba = paras.eva_numba_decorator
+        self.python_seed = paras.exp_python_seed
+        self.numpy_seed = paras.exp_numpy_seed
+        self.worker_seed = paras.exp_worker_seed
+        self.logger = getattr(paras, "exp_logger", None)
+        self._run_summary = {
+            "final_population_size": 0,
+            "best_objective": None,
+            "best_code": None,
+            "best_algorithm": None,
+            "saved_generation_files": [],
+            "saved_best_files": [],
+            "seed_summary": {
+                "python_seed": self.python_seed,
+                "numpy_seed": self.numpy_seed,
+                "worker_seed": self.worker_seed,
+            },
+        }
 
         print("- EoH parameters loaded -")
 
-        # Set a random seed
-        random.seed(2024)
+        # Re-seed after problem setup so operator gating is not affected by upstream constructors.
+        set_global_seeds(self.python_seed, self.numpy_seed)
 
     # add new individual to population
     def add2pop(self, population, offspring):
@@ -89,7 +107,9 @@ class EOH:
         # interface for ec operators
         interface_ec = InterfaceEC(self.pop_size, self.m, self.api_endpoint, self.api_key, self.llm_model, self.use_local_llm, self.llm_local_url,
                                    self.debug_mode, interface_prob, select=self.select,n_p=self.exp_n_proc,
-                                   timeout = self.timeout, use_numba=self.use_numba
+                                   logger=self.logger,
+                                   timeout = self.timeout, use_numba=self.use_numba,
+                                   worker_seed_base=self.worker_seed
                                    )
 
         # initialization
@@ -148,7 +168,15 @@ class EOH:
                 print(f" OP: {op}, [{i + 1} / {n_op}] ", end="|") 
                 op_w = self.operator_weights[i]
                 if (np.random.rand() < op_w):
-                    parents, offsprings = interface_ec.get_algorithm(population, op)
+                    parents, offsprings = interface_ec.get_algorithm(
+                        population,
+                        op,
+                        context={
+                            "population_index": pop + 1,
+                            "operator_index": i + 1,
+                            "operator_count": n_op,
+                        },
+                    )
                 self.add2pop(population, offsprings)  # Check duplication, and add the new offspring
                 for off in offsprings:
                     print(" Obj: ", off['objective'], end="|")
@@ -170,11 +198,13 @@ class EOH:
             filename = self.output_path + "/results/pops/population_generation_" + str(pop + 1) + ".json"
             with open(filename, 'w') as f:
                 json.dump(population, f, indent=5)
+            self._run_summary["saved_generation_files"].append(filename)
 
             # Save the best one to a file
             filename = self.output_path + "/results/pops_best/population_generation_" + str(pop + 1) + ".json"
             with open(filename, 'w') as f:
                 json.dump(population[0], f, indent=5)
+            self._run_summary["saved_best_files"].append(filename)
 
 
             print(f"--- {pop + 1} of {self.n_pop} populations finished. Time Cost:  {((time.time()-time_start)/60):.1f} m")
@@ -182,4 +212,13 @@ class EOH:
             for i in range(len(population)):
                 print(str(population[i]['objective']) + " ", end="")
             print()
+
+        if population:
+            self._run_summary["final_population_size"] = len(population)
+            self._run_summary["best_objective"] = population[0]["objective"]
+            self._run_summary["best_code"] = population[0]["code"]
+            self._run_summary["best_algorithm"] = population[0]["algorithm"]
+
+    def get_run_summary(self):
+        return dict(self._run_summary)
 

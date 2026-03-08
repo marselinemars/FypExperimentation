@@ -38,6 +38,10 @@ class Paras():
         self.exp_continue_id = 0
         self.exp_continue_path = "./results/pops/population_generation_0.json"
         self.exp_n_proc = 1
+        self.exp_seed = 2024
+        self.exp_python_seed = None
+        self.exp_numpy_seed = None
+        self.exp_worker_seed = None
         
         #####################
         ###  Evaluation settings  ###
@@ -79,7 +83,7 @@ class Paras():
 
         if self.ec_operator_weights == None:
             self.ec_operator_weights = [1 for _ in range(len(self.ec_operators))]
-        elif len(self.ec_operator) != len(self.ec_operator_weights):
+        elif len(self.ec_operators) != len(self.ec_operator_weights):
             print("Warning! Lengths of ec_operator_weights and ec_operator shoud be the same.")
             self.ec_operator_weights = [1 for _ in range(len(self.ec_operators))]
                     
@@ -95,6 +99,14 @@ class Paras():
             self.eva_numba_decorator  = True
         elif self.problem == 'tsp_construct':
             self.eva_timeout = 20
+
+    def set_reproducibility(self):
+        if self.exp_python_seed is None:
+            self.exp_python_seed = self.exp_seed
+        if self.exp_numpy_seed is None:
+            self.exp_numpy_seed = self.exp_seed
+        if self.exp_worker_seed is None:
+            self.exp_worker_seed = self.exp_seed
                 
     def set_paras(self, *args, **kwargs):
         
@@ -111,6 +123,9 @@ class Paras():
         
         # Initialize evaluation settings
         self.set_evaluation()
+
+        # Initialize reproducibility settings
+        self.set_reproducibility()
 
 
 

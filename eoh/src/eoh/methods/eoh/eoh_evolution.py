@@ -1,6 +1,8 @@
 import re
 import time
+import uuid
 from ...llm.interface_LLM import InterfaceLLM
+
 
 class Evolution():
 
@@ -119,8 +121,16 @@ Finally, provide the revised code, keeping the function name, inputs, and output
 
 
     def _get_alg(self,prompt_content):
+        trace = {
+            "request_id": uuid.uuid4().hex,
+            "prompt": prompt_content,
+            "responses": [],
+            "parse_success": False,
+            "parse_error": None,
+        }
 
         response = self.interface_llm.get_response(prompt_content)
+        trace["responses"].append(response)
 
         algorithm = re.findall(r"\{(.*)\}", response, re.DOTALL)
         if len(algorithm) == 0:
@@ -141,6 +151,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
                 print("Error: algorithm or code not identified, wait 1 seconds and retrying ... ")
 
             response = self.interface_llm.get_response(prompt_content)
+            trace["responses"].append(response)
 
             algorithm = re.findall(r"\{(.*)\}", response, re.DOTALL)
             if len(algorithm) == 0:
@@ -159,13 +170,17 @@ Finally, provide the revised code, keeping the function name, inputs, and output
                 break
             n_retry +=1
 
+        if len(algorithm) == 0 or len(code) == 0:
+            trace["parse_error"] = "algorithm_or_code_not_identified"
+        else:
+            trace["parse_success"] = True
+
         algorithm = algorithm[0]
-        code = code[0] 
+        code = code[0]
 
-        code_all = code+" "+", ".join(s for s in self.prompt_func_outputs) 
+        code_all = code+" "+", ".join(s for s in self.prompt_func_outputs)
 
-
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]
 
 
     def i1(self):
@@ -177,7 +192,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
       
-        [code_all, algorithm] = self._get_alg(prompt_content)
+        [code_all, algorithm, trace] = self._get_alg(prompt_content)
 
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
@@ -185,7 +200,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
 
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]
     
     def e1(self,parents):
       
@@ -196,7 +211,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
       
-        [code_all, algorithm] = self._get_alg(prompt_content)
+        [code_all, algorithm, trace] = self._get_alg(prompt_content)
 
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
@@ -204,7 +219,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
 
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]
     
     def e2(self,parents):
       
@@ -215,7 +230,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
       
-        [code_all, algorithm] = self._get_alg(prompt_content)
+        [code_all, algorithm, trace] = self._get_alg(prompt_content)
 
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
@@ -223,7 +238,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
 
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]
     
     def m1(self,parents):
       
@@ -234,7 +249,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
       
-        [code_all, algorithm] = self._get_alg(prompt_content)
+        [code_all, algorithm, trace] = self._get_alg(prompt_content)
 
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
@@ -242,7 +257,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
 
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]
     
     def m2(self,parents):
       
@@ -253,7 +268,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
       
-        [code_all, algorithm] = self._get_alg(prompt_content)
+        [code_all, algorithm, trace] = self._get_alg(prompt_content)
 
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
@@ -261,7 +276,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
 
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]
     
     def m3(self,parents):
       
@@ -272,7 +287,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
       
-        [code_all, algorithm] = self._get_alg(prompt_content)
+        [code_all, algorithm, trace] = self._get_alg(prompt_content)
 
         if self.debug_mode:
             print("\n >>> check designed algorithm: \n", algorithm)
@@ -280,4 +295,4 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             print(">>> Press 'Enter' to continue")
             input()
 
-        return [code_all, algorithm]
+        return [code_all, algorithm, trace]

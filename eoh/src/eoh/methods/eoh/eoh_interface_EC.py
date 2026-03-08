@@ -1,14 +1,17 @@
 import numpy as np
 import time
+import uuid
+import hashlib
 from .eoh_evolution import Evolution
 import warnings
 from joblib import Parallel, delayed
 from .evaluator_accelerate import add_numba_decorator
 import re
 import concurrent.futures
+from ...utils.seeding import derive_seed, set_global_seeds
 
 class InterfaceEC():
-    def __init__(self, pop_size, m, api_endpoint, api_key, llm_model,llm_use_local,llm_local_url, debug_mode, interface_prob, select,n_p,timeout,use_numba,**kwargs):
+    def __init__(self, pop_size, m, api_endpoint, api_key, llm_model,llm_use_local,llm_local_url, debug_mode, interface_prob, select,n_p,timeout,use_numba, logger=None, worker_seed_base=None, **kwargs):
 
         # LLM settings
         self.pop_size = pop_size
@@ -26,6 +29,23 @@ class InterfaceEC():
         
         self.timeout = timeout
         self.use_numba = use_numba
+        self.logger = logger
+        self.worker_seed_base = worker_seed_base
+
+    def _text_hash(self, value):
+        if value is None:
+            return None
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    def _summarize_parent(self, parent):
+        if parent is None:
+            return None
+        return {
+            "objective": parent.get("objective"),
+            "code_sha256": self._text_hash(parent.get("code")),
+            "algorithm_sha256": self._text_hash(parent.get("algorithm")),
+            "algorithm_preview": (parent.get("algorithm") or "")[:200],
+        }
         
     def code2file(self,code):
         with open("./ael_alg.py", "w") as file:
@@ -66,7 +86,7 @@ class InterfaceEC():
         population = []
 
         for i in range(n_create):
-            _,pop = self.get_algorithm([],'i1')
+            _,pop = self.get_algorithm([], 'i1', context={"population_index": 0, "operator_index": 0, "operator_count": 1, "initialization_batch": i + 1})
             for p in pop:
                 population.append(p)
              
@@ -107,33 +127,88 @@ class InterfaceEC():
             'objective': None,
             'other_inf': None
         }
+        llm_trace = None
         if operator == "i1":
             parents = None
-            [offspring['code'],offspring['algorithm']] =  self.evol.i1()            
+            [offspring['code'],offspring['algorithm'], llm_trace] =  self.evol.i1()
         elif operator == "e1":
             parents = self.select.parent_selection(pop,self.m)
-            [offspring['code'],offspring['algorithm']] = self.evol.e1(parents)
+            [offspring['code'],offspring['algorithm'], llm_trace] = self.evol.e1(parents)
         elif operator == "e2":
             parents = self.select.parent_selection(pop,self.m)
-            [offspring['code'],offspring['algorithm']] = self.evol.e2(parents) 
+            [offspring['code'],offspring['algorithm'], llm_trace] = self.evol.e2(parents)
         elif operator == "m1":
             parents = self.select.parent_selection(pop,1)
-            [offspring['code'],offspring['algorithm']] = self.evol.m1(parents[0])   
+            [offspring['code'],offspring['algorithm'], llm_trace] = self.evol.m1(parents[0])
         elif operator == "m2":
             parents = self.select.parent_selection(pop,1)
-            [offspring['code'],offspring['algorithm']] = self.evol.m2(parents[0]) 
+            [offspring['code'],offspring['algorithm'], llm_trace] = self.evol.m2(parents[0])
         elif operator == "m3":
             parents = self.select.parent_selection(pop,1)
-            [offspring['code'],offspring['algorithm']] = self.evol.m3(parents[0]) 
+            [offspring['code'],offspring['algorithm'], llm_trace] = self.evol.m3(parents[0])
         else:
             print(f"Evolution operator [{operator}] has not been implemented ! \n") 
 
-        return parents, offspring
+        return parents, offspring, llm_trace
 
-    def get_offspring(self, pop, operator):
+    def get_offspring(self, pop, operator, context=None):
+        context = context or {}
+        attempt_id = uuid.uuid4().hex
+        started_at = time.time()
+        task_index = context.get("task_index", 0)
+        attempt_seed = derive_seed(
+            self.worker_seed_base,
+            operator,
+            context.get("population_index"),
+            context.get("operator_index"),
+            context.get("initialization_batch"),
+            task_index,
+            "attempt",
+        )
+        evaluation_seed = derive_seed(
+            self.worker_seed_base,
+            operator,
+            context.get("population_index"),
+            context.get("operator_index"),
+            context.get("initialization_batch"),
+            task_index,
+            "evaluation",
+        )
+        log_record = {
+            "attempt_id": attempt_id,
+            "operator": operator,
+            "population_index": context.get("population_index"),
+            "operator_index": context.get("operator_index"),
+            "operator_count": context.get("operator_count"),
+            "initialization_batch": context.get("initialization_batch"),
+            "task_index": task_index,
+            "pop_size": self.pop_size,
+            "parent_count_requested": self.m if operator in ["e1", "e2"] else (0 if operator == "i1" else 1),
+            "timeout_seconds": self.timeout,
+            "used_numba": self.use_numba,
+            "worker_seed_attempt": attempt_seed,
+            "worker_seed_evaluation": evaluation_seed,
+            "status": "invalid",
+            "error_type": None,
+            "error_message": None,
+            "objective": None,
+            "code_sha256": None,
+            "algorithm_sha256": None,
+            "raw_code_sha256": None,
+            "evaluation_code_sha256": None,
+            "parents": [],
+            "llm_trace": None,
+            "elapsed_seconds": None,
+        }
 
         try:
-            p, offspring = self._get_alg(pop, operator)
+            set_global_seeds(attempt_seed, attempt_seed)
+            p, offspring, llm_trace = self._get_alg(pop, operator)
+            parent_list = p if isinstance(p, list) else ([p] if p is not None else [])
+            log_record["parents"] = [self._summarize_parent(parent) for parent in parent_list]
+            log_record["llm_trace"] = llm_trace
+            log_record["raw_code_sha256"] = self._text_hash(offspring["code"])
+            log_record["algorithm_sha256"] = self._text_hash(offspring["algorithm"])
             
             if self.use_numba:
                 
@@ -148,6 +223,7 @@ class InterfaceEC():
                 code = add_numba_decorator(program=offspring['code'], function_name=function_name)
             else:
                 code = offspring['code']
+            log_record["evaluation_code_sha256"] = self._text_hash(code)
 
             n_retry= 1
             while self.check_duplicate(pop, offspring['code']):
@@ -156,7 +232,12 @@ class InterfaceEC():
                 if self.debug:
                     print("duplicated code, wait 1 second and retrying ... ")
                     
-                p, offspring = self._get_alg(pop, operator)
+                p, offspring, llm_trace = self._get_alg(pop, operator)
+                parent_list = p if isinstance(p, list) else ([p] if p is not None else [])
+                log_record["parents"] = [self._summarize_parent(parent) for parent in parent_list]
+                log_record["llm_trace"] = llm_trace
+                log_record["raw_code_sha256"] = self._text_hash(offspring["code"])
+                log_record["algorithm_sha256"] = self._text_hash(offspring["algorithm"])
 
                 if self.use_numba:
                     # Regular expression pattern to match function definitions
@@ -170,21 +251,30 @@ class InterfaceEC():
                     code = add_numba_decorator(program=offspring['code'], function_name=function_name)
                 else:
                     code = offspring['code']
+                log_record["evaluation_code_sha256"] = self._text_hash(code)
                     
                 if n_retry > 1:
                     break
                 
                 
             #self.code2file(offspring['code'])
+            set_global_seeds(evaluation_seed, evaluation_seed)
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(self.interface_eval.evaluate, code)
                 fitness = future.result(timeout=self.timeout)
+                if fitness is None:
+                    raise ValueError("candidate evaluation returned None")
                 offspring['objective'] = np.round(fitness, 5)
                 future.cancel()        
                 # fitness = self.interface_eval.evaluate(code)
-                
+            log_record["status"] = "valid"
+            log_record["objective"] = offspring["objective"]
+            log_record["code_sha256"] = self._text_hash(offspring["code"])
+
 
         except Exception as e:
+            log_record["error_type"] = type(e).__name__
+            log_record["error_message"] = str(e)
 
             offspring = {
                 'algorithm': None,
@@ -194,8 +284,9 @@ class InterfaceEC():
             }
             p = None
 
+        log_record["elapsed_seconds"] = round(time.time() - started_at, 6)
         # Round the objective values
-        return p, offspring
+        return p, offspring, log_record
     # def process_task(self,pop, operator):
     #     result =  None, {
     #             'algorithm': None,
@@ -215,10 +306,17 @@ class InterfaceEC():
     #     return result
 
     
-    def get_algorithm(self, pop, operator):
+    def get_algorithm(self, pop, operator, context=None):
         results = []
         try:
-            results = Parallel(n_jobs=self.n_p,timeout=self.timeout+15)(delayed(self.get_offspring)(pop, operator) for _ in range(self.pop_size))
+            results = Parallel(n_jobs=self.n_p,timeout=self.timeout+15)(
+                delayed(self.get_offspring)(
+                    pop,
+                    operator,
+                    context={**(context or {}), "task_index": task_index},
+                )
+                for task_index in range(self.pop_size)
+            )
         except Exception as e:
             if self.debug:
                 print(f"Error: {e}")
@@ -230,9 +328,11 @@ class InterfaceEC():
         out_p = []
         out_off = []
 
-        for p, off in results:
+        for p, off, log_record in results:
             out_p.append(p)
             out_off.append(off)
+            if self.logger is not None:
+                self.logger.log_candidate_attempt(log_record)
             if self.debug:
                 print(f">>> check offsprings: \n {off}")
         return out_p, out_off

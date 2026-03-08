@@ -2,6 +2,8 @@
 import random
 
 from .utils import createFolders
+from .utils.runLogger import RunLogger
+from .utils.seeding import set_global_seeds
 from .methods import methods
 from .problems import problems
 
@@ -14,6 +16,13 @@ class EVOL:
         print("----------------------------------------- ")
         print("---              Start EoH            ---")
         print("-----------------------------------------")
+        # Create a unique run directory and place all artifacts inside it.
+        self.logger = RunLogger(paras.exp_output_path)
+        paras.exp_base_output_path = self.logger.base_output_path
+        paras.exp_run_id = self.logger.run_id
+        paras.exp_run_dir = self.logger.run_dir
+        paras.exp_logger = self.logger
+        paras.exp_output_path = self.logger.run_dir
         # Create folder #
         createFolders.create_folders(paras.exp_output_path)
         print("- output folder created -")
@@ -24,8 +33,8 @@ class EVOL:
 
         self.prob = prob
 
-        # Set a random seed
-        random.seed(2024)
+        # Set reproducible main-process seeds before problem and method setup.
+        set_global_seeds(paras.exp_python_seed, paras.exp_numpy_seed)
 
         
     # run methods
@@ -39,7 +48,27 @@ class EVOL:
 
         method = methodGenerator.get_method()
 
+        manifest = self.logger.build_manifest(
+            self.paras,
+            extra={
+                "problem_class": problem.__class__.__name__ if problem is not None else None,
+                "method_class": method.__class__.__name__ if method is not None else None,
+            },
+        )
+        self.logger.write_manifest(manifest)
+
         method.run()
+
+        summary = {
+            "problem_class": problem.__class__.__name__ if problem is not None else None,
+            "method_class": method.__class__.__name__ if method is not None else None,
+            "results_dir": self.paras.exp_output_path,
+        }
+
+        if hasattr(method, "get_run_summary"):
+            summary.update(method.get_run_summary())
+
+        self.logger.write_summary(summary)
 
         print("> End of Evolution! ")
         print("----------------------------------------- ")
