@@ -333,6 +333,7 @@ The purpose of this log is to prevent silent drift.
 - Why baseline-safe:
   - this is a post-run diagnostic script only
   - it does not modify prompts, operators, survival, or evaluator behavior during search
+  - later refinement adds choice-only trace signatures to distinguish score-scale differences from actual bin-choice differences
 
 ## Risks Still Open
 

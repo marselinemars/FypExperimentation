@@ -149,6 +149,18 @@ def trace_online_binpack(problem, items, capacity, alg, max_steps):
     return trace
 
 
+def choice_signature_from_steps(steps):
+    return [
+        {
+            "step_index": step["step_index"],
+            "item": step["item"],
+            "chosen_bin_index": step["chosen_bin_index"],
+            "priority_argmax_index": step["priority_argmax_index"],
+        }
+        for step in steps
+    ]
+
+
 def evaluate_candidate(problem, evaluation_code, trace_steps):
     alg = load_algorithm_module(evaluation_code)
     search_problem_metrics = []
@@ -197,9 +209,11 @@ def evaluate_candidate(problem, evaluation_code, trace_steps):
 def summarize_candidates(candidate_results):
     fitness_signatures = {}
     decision_signatures = {}
+    choice_signatures = {}
     for result in candidate_results:
         metrics = result["diagnostics"]["problem_metrics"]
         trace = result["diagnostics"]["trace"] or {}
+        steps = trace.get("steps") or []
         fitness_signature = json.dumps(
             [
                 {
@@ -210,16 +224,20 @@ def summarize_candidates(candidate_results):
             ],
             sort_keys=True,
         )
-        decision_signature = json.dumps(trace.get("steps") or [], sort_keys=True)
+        decision_signature = json.dumps(steps, sort_keys=True)
+        choice_signature = json.dumps(choice_signature_from_steps(steps), sort_keys=True)
         fitness_signatures.setdefault(fitness_signature, []).append(result["attempt_id"])
         decision_signatures.setdefault(decision_signature, []).append(result["attempt_id"])
+        choice_signatures.setdefault(choice_signature, []).append(result["attempt_id"])
 
     return {
         "candidate_count": len(candidate_results),
         "unique_per_instance_bin_count_signatures": len(fitness_signatures),
         "unique_trace_signatures": len(decision_signatures),
+        "unique_choice_trace_signatures": len(choice_signatures),
         "fitness_signature_groups": list(fitness_signatures.values()),
         "trace_signature_groups": list(decision_signatures.values()),
+        "choice_trace_signature_groups": list(choice_signatures.values()),
     }
 
 
