@@ -217,6 +217,20 @@ The purpose of this log is to prevent silent drift.
   - verification only
   - no search, evaluation, or generation behavior is modified
 
+### 13. HTTP and full-base-URL support for remote LLM endpoint
+
+- File: [api_general.py](C:/Users/pc%20omen/Documents/experimentation/EoH/eoh/src/eoh/llm/api_general.py)
+- Behavior added:
+  - supports full endpoint URLs with scheme and optional base path
+  - supports both `http` and `https`
+  - preserves backward compatibility for the upstream bare-host HTTPS mode
+- Why this belongs in S0:
+  - the frozen HPC deployment uses `http://.../v1`
+  - upstream `InterfaceAPI` always used `HTTPSConnection` and always appended `/v1/chat/completions`, which made the HPC endpoint unusable from the baseline fork
+- Behavioral note:
+  - this is transport-layer compatibility only
+  - prompt, operator, selection, survival, and evaluator logic are unchanged
+
 ## Risks Still Open
 
 - The S0 runner is not yet unified. The upstream example script is still the active launcher.

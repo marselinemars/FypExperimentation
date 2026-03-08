@@ -1,5 +1,6 @@
 import http.client
 import json
+from urllib.parse import urlparse
 
 
 class InterfaceAPI:
@@ -9,6 +10,25 @@ class InterfaceAPI:
         self.model_LLM = model_LLM
         self.debug_mode = debug_mode
         self.n_trial = 5
+        self.connection_class, self.connection_host, self.request_path = self._resolve_endpoint(api_endpoint)
+
+    def _resolve_endpoint(self, api_endpoint):
+        parsed = urlparse(api_endpoint)
+
+        if parsed.scheme in ["http", "https"] and parsed.netloc:
+            connection_class = (
+                http.client.HTTPConnection if parsed.scheme == "http" else http.client.HTTPSConnection
+            )
+            connection_host = parsed.netloc
+            base_path = parsed.path.rstrip("/")
+            if base_path:
+                request_path = base_path + "/chat/completions"
+            else:
+                request_path = "/v1/chat/completions"
+            return connection_class, connection_host, request_path
+
+        # Backward-compatible path: upstream code expected a bare host and always used HTTPS.
+        return http.client.HTTPSConnection, api_endpoint, "/v1/chat/completions"
 
     def get_response(self, prompt_content):
         payload_explanation = json.dumps(
@@ -35,8 +55,8 @@ class InterfaceAPI:
             if n_trial > self.n_trial:
                 return response
             try:
-                conn = http.client.HTTPSConnection(self.api_endpoint)
-                conn.request("POST", "/v1/chat/completions", payload_explanation, headers)
+                conn = self.connection_class(self.connection_host)
+                conn.request("POST", self.request_path, payload_explanation, headers)
                 res = conn.getresponse()
                 data = res.read()
                 json_data = json.loads(data)
