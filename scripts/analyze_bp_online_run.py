@@ -1,6 +1,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -21,6 +22,21 @@ from eoh.problems.optimization.bp_online.run import BPONLINE
 
 def utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def sanitize_json_value(value):
+    if isinstance(value, dict):
+        return {key: sanitize_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [sanitize_json_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_json_value(item) for item in value]
+    if isinstance(value, np.generic):
+        return sanitize_json_value(value.item())
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+    return value
 
 
 def load_json(path):
@@ -289,9 +305,10 @@ def main():
         "candidate_results": candidate_results,
         "reconstruction_failures": reconstruction_failures,
     }
+    payload = sanitize_json_value(payload)
 
     with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(payload, file, indent=2)
+        json.dump(payload, file, indent=2, allow_nan=False)
 
     print(json.dumps(payload["summary"], indent=2))
     print(f"Saved diagnostics to {output_path}")
