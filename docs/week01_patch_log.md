@@ -231,6 +231,23 @@ The purpose of this log is to prevent silent drift.
   - this is transport-layer compatibility only
   - prompt, operator, selection, survival, and evaluator logic are unchanged
 
+### 14. Separate smoke-test configuration
+
+- File: [smoke_bp_online.yaml](C:/Users/pc%20omen/Documents/experimentation/EoH/configs/smoke_bp_online.yaml)
+- File: [s0_bp_online_runner.ipynb](C:/Users/pc%20omen/Documents/experimentation/EoH/notebooks/s0_bp_online_runner.ipynb)
+- Behavior added:
+  - introduced a separate low-budget smoke config
+  - set the notebook to use the smoke config by default
+  - preserved the frozen baseline config unchanged
+- Smoke-specific settings:
+  - `population_size = 2`
+  - `n_populations = 1`
+  - `parallel_workers = 1`
+  - `timeout_seconds = 180`
+- Why baseline-safe:
+  - this isolates pipeline diagnosis from the frozen S0 baseline
+  - no baseline result needs to be reinterpreted or contaminated by smoke-test settings
+
 ## Risks Still Open
 
 - The S0 runner is not yet unified. The upstream example script is still the active launcher.
