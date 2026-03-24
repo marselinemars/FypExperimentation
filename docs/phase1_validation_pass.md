@@ -12,13 +12,19 @@ python scripts/run_baseline.py --config configs/smoke_bp_online.yaml
 
 2. Real S4a runs:
 
-Run the baseline config 2-3 times:
+Run the Phase 1 validation config 2-3 times:
 
 ```bash
-python scripts/run_baseline.py --config configs/baseline_bp_online.yaml
+python scripts/run_baseline.py --config configs/s4a_validation_bp_online.yaml
 ```
 
-All three configs currently enable the S4a layer through:
+The dedicated validation config keeps the same broad search path but disables `numba`:
+
+- `evaluation.use_numba_decorator: false`
+
+This is intentional for Phase 1 artifact validation only. It is not a baseline-results config.
+
+All configs currently enable the S4a layer through:
 
 - `behavior.enabled: true`
 - `behavior.system_id: S4a`
