@@ -46,6 +46,22 @@ def _sha256_text(content):
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
+def _safe_filename_part(value, max_len=64):
+    if value is None:
+        return "none"
+    value = str(value)
+    cleaned = []
+    for ch in value:
+        if ch.isalnum() or ch in ["-", "_", "."]:
+            cleaned.append(ch)
+        else:
+            cleaned.append("_")
+    safe = "".join(cleaned).strip("._")
+    if not safe:
+        safe = "value"
+    return safe[:max_len]
+
+
 def _git_info(cwd):
     info = {"commit": None, "remote_origin": None}
     try:
@@ -173,18 +189,58 @@ class RunLogger:
         prompt = trace.get("prompt")
         responses = list(trace.get("responses") or [])
         request_id = trace.get("request_id") or uuid.uuid4().hex
+        safe_attempt_id = _safe_filename_part(attempt_id)
+        safe_request_id = _safe_filename_part(request_id)
+        os.makedirs(self.prompts_dir, exist_ok=True)
+        os.makedirs(self.responses_dir, exist_ok=True)
 
-        prompt_filename = f"{attempt_id}__{request_id}__prompt.txt"
+        prompt_filename = f"{safe_attempt_id}__{safe_request_id}__prompt.txt"
         prompt_path = os.path.join(self.prompts_dir, prompt_filename)
-        if prompt is not None:
-            _write_text(prompt_path, prompt)
+        try:
+            if prompt is not None:
+                _write_text(prompt_path, prompt)
+        except OSError as exc:
+            return {
+                "request_id": request_id,
+                "prompt_file": None,
+                "prompt_sha256": _sha256_text(prompt),
+                "response_files": [],
+                "response_sha256": [_sha256_text(response) for response in responses],
+                "response_count": len(responses),
+                "parse_success": trace.get("parse_success"),
+                "parse_error": trace.get("parse_error"),
+                "parse_retry_count": max(len(responses) - 1, 0),
+                "trace_persist_error": {
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                    "stage": "prompt_write",
+                },
+            }
 
         response_paths = []
         for index, response in enumerate(responses, start=1):
-            response_filename = f"{attempt_id}__{request_id}__response_{index}.txt"
+            response_filename = f"{safe_attempt_id}__{safe_request_id}__response_{index}.txt"
             response_path = os.path.join(self.responses_dir, response_filename)
-            _write_text(response_path, response)
-            response_paths.append(response_path)
+            try:
+                _write_text(response_path, response)
+                response_paths.append(response_path)
+            except OSError as exc:
+                return {
+                    "request_id": request_id,
+                    "prompt_file": prompt_path if prompt is not None else None,
+                    "prompt_sha256": _sha256_text(prompt),
+                    "response_files": response_paths,
+                    "response_sha256": [_sha256_text(response) for response in responses],
+                    "response_count": len(responses),
+                    "parse_success": trace.get("parse_success"),
+                    "parse_error": trace.get("parse_error"),
+                    "parse_retry_count": max(len(responses) - 1, 0),
+                    "trace_persist_error": {
+                        "type": type(exc).__name__,
+                        "message": str(exc),
+                        "stage": "response_write",
+                    },
+                }
 
         self.stats["llm_requests"] += 1
         if len(responses) > 1:
