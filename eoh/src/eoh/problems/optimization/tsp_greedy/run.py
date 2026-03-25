@@ -24,6 +24,7 @@ class TSPCONST():
 
 
         self.prompts = GetPrompts()
+        self.last_evaluation_error = None
 
         getData = GetData(self.n_instance,self.problem_size)
         self.instance_data = getData.generate_instances()
@@ -51,6 +52,7 @@ class TSPCONST():
 
     #@func_set_timeout(5)
     def greedy(self,eva):
+        self.last_evaluation_error = None
 
         dis = np.ones(self.n_instance)
         n_ins = 0
@@ -81,7 +83,10 @@ class TSPCONST():
                 next_node = eva.select_next_node(current_node, destination_node, unvisited_near_nodes, distance_matrix)
 
                 if next_node in route:
-                    #print("wrong algorithm select duplicate node, retrying ...")
+                    self.last_evaluation_error = {
+                        "type": "ValueError",
+                        "message": f"select_next_node chose duplicate node {next_node}",
+                    }
                     return None
 
                 current_node = next_node
@@ -114,6 +119,7 @@ class TSPCONST():
 
 
     def evaluate(self, code_string):
+        self.last_evaluation_error = None
         try:
             # Suppress warnings
             with warnings.catch_warnings():
@@ -131,7 +137,10 @@ class TSPCONST():
                 fitness = self.greedy(heuristic_module)
                 return fitness
         except Exception as e:
-            #print("Error:", str(e))
+            self.last_evaluation_error = {
+                "type": type(e).__name__,
+                "message": str(e),
+            }
             return None
         # try:
         #     heuristic_module = importlib.import_module("ael_alg")
