@@ -33,7 +33,7 @@ class InterfaceEC():
         self.logger = logger
         self.worker_seed_base = worker_seed_base
         self.behavior_pipeline = None
-        if behavior_enabled and logger is not None and interface_prob.__class__.__name__ == "BPONLINE":
+        if behavior_enabled and logger is not None and interface_prob.__class__.__name__ in ["BPONLINE", "TSPCONST"]:
             self.behavior_pipeline = BehaviorPipeline(
                 interface_prob,
                 logger,

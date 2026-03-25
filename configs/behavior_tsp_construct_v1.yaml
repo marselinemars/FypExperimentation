@@ -1,0 +1,28 @@
+enabled: true
+system_id: "S4a"
+objective_duplicate_epsilon: 1.0e-9
+
+trace:
+  traced_instance_ids:
+    - 0
+    - 1
+  trace_prefix_steps: 25
+  permutation_seed: 2024
+
+thresholds:
+  high_symmetry_duplicate_capacity_rate: 0.95
+  high_symmetry_tie_hit_rate: 0.20
+  high_symmetry_chosen_group_size: 3.0
+  low_confidence_margin_mean: 0.001
+  aggressive_opening_ratio_first_third: 0.20
+  fragmentation_var_leftover: 150.0
+  fragmentation_mean_leftover_low: 15.0
+  fragmentation_mean_leftover_high: 50.0
+  robustness_score_drop: 0.002
+  narrow_generalization_score_drop: 0.005
+  low_instance_variance_bins_used: 50.0
+  high_instance_variance_bins_used: 200.0
+
+notes:
+  thresholds_version: "v1_provisional_defaults"
+  threshold_policy: "These thresholds are provisional S4a defaults for TSP construct tracing and mainly support duplicate/symmetry diagnosis. BP-specific score-margin and leftover labels may remain inactive."
