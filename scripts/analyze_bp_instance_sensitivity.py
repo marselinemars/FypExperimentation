@@ -155,71 +155,77 @@ def discover_candidate_records(run_dir):
                 cards.append(load_json(path))
             except Exception:
                 continue
+    cards_by_id = {
+        (card.get("identity") or {}).get("candidate_id"): card
+        for card in cards
+        if (card.get("identity") or {}).get("candidate_id")
+    }
+
+    responses_dir = os.path.join(run_dir, "logs", "responses")
+    response_files_by_id = {}
+    if os.path.isdir(responses_dir):
+        for path in sorted(glob.glob(os.path.join(responses_dir, "*__response_*.txt"))):
+            candidate_id = os.path.basename(path).split("__", 1)[0]
+            if not candidate_id:
+                continue
+            response_files_by_id.setdefault(candidate_id, []).append(path)
 
     discovered = []
     seen_ids = set()
+    all_candidate_ids = sorted(set(response_files_by_id.keys()) | set(attempts_by_id.keys()) | set(cards_by_id.keys()))
 
-    for card in cards:
-        identity = card.get("identity") or {}
-        if not identity.get("valid"):
-            continue
-        attempt_id = identity.get("candidate_id")
+    for attempt_id in all_candidate_ids:
         if not attempt_id or attempt_id in seen_ids:
             continue
+        card = cards_by_id.get(attempt_id) or {}
+        identity = card.get("identity") or {}
         attempt = attempts_by_id.get(attempt_id) or {}
         response_files = (
-            ((attempt.get("llm_trace_files") or {}).get("response_files"))
-            or sorted(glob.glob(os.path.join(run_dir, "logs", "responses", f"{attempt_id}__*__response_*.txt")))
+            response_files_by_id.get(attempt_id)
+            or ((attempt.get("llm_trace_files") or {}).get("response_files"))
+            or []
         )
+        if not response_files and not identity and not attempt:
+            continue
+
+        status = None
+        if attempt.get("status") is not None:
+            status = attempt.get("status")
+        elif identity.get("valid") is True:
+            status = "valid"
+        elif identity.get("valid") is False:
+            status = "invalid"
+
+        source_parts = []
+        if response_files:
+            source_parts.append("response_files")
+        if identity:
+            source_parts.append("behavior_card")
+        if attempt:
+            source_parts.append("candidate_attempt")
+
         discovered.append(
             {
                 "attempt_id": attempt_id,
                 "operator": identity.get("operator") or attempt.get("operator"),
                 "objective": identity.get("objective") if identity.get("objective") is not None else attempt.get("objective"),
                 "code_sha256": identity.get("code_hash") or attempt.get("code_sha256"),
-                "raw_code_sha256": attempt.get("raw_code_sha256") or identity.get("code_hash"),
+                "raw_code_sha256": attempt.get("raw_code_sha256") or identity.get("code_hash") or attempt.get("code_sha256"),
                 "used_numba": attempt.get("used_numba", default_used_numba),
-                "status": "valid",
+                "status": status,
                 "llm_trace_files": {
                     "response_files": response_files,
                 },
-                "source": "behavior_card",
+                "source": "+".join(source_parts) if source_parts else "unknown",
             }
         )
         seen_ids.add(attempt_id)
-
-    if not discovered:
-        for attempt in attempts:
-            if attempt.get("status") != "valid":
-                continue
-            attempt_id = attempt.get("attempt_id")
-            if not attempt_id or attempt_id in seen_ids:
-                continue
-            response_files = (
-                ((attempt.get("llm_trace_files") or {}).get("response_files"))
-                or sorted(glob.glob(os.path.join(run_dir, "logs", "responses", f"{attempt_id}__*__response_*.txt")))
-            )
-            discovered.append(
-                {
-                    "attempt_id": attempt_id,
-                    "operator": attempt.get("operator"),
-                    "objective": attempt.get("objective"),
-                    "code_sha256": attempt.get("code_sha256"),
-                    "raw_code_sha256": attempt.get("raw_code_sha256") or attempt.get("code_sha256"),
-                    "used_numba": attempt.get("used_numba", default_used_numba),
-                    "status": attempt.get("status"),
-                    "llm_trace_files": {
-                        "response_files": response_files,
-                    },
-                    "source": "candidate_attempt",
-                }
-            )
-            seen_ids.add(attempt_id)
 
     return {
         "manifest": manifest,
         "attempts_present": bool(attempts),
         "cards_present": bool(cards),
+        "responses_present": bool(response_files_by_id),
         "candidate_records": discovered,
     }
 
@@ -686,6 +692,7 @@ def main():
         "candidate_discovery": {
             "used_behavior_cards": discovery["cards_present"],
             "used_candidate_attempts": discovery["attempts_present"],
+            "used_response_files": discovery["responses_present"],
             "candidate_record_count": len(candidate_records),
             "candidate_sources": sorted({record.get("source") for record in candidate_records}),
         },
