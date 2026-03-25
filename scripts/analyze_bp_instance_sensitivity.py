@@ -91,12 +91,18 @@ def parse_response_to_code(response_text, prompt_outputs):
     code = re.findall(r"import.*return", response_text, re.DOTALL)
     if len(code) == 0:
         code = re.findall(r"def.*return", response_text, re.DOTALL)
+    if len(code) == 0:
+        fenced = re.findall(r"```(?:python)?\s*(.*?)```", response_text, re.DOTALL | re.IGNORECASE)
+        for block in fenced:
+            if "def " in block and "return" in block:
+                code = [block.strip()]
+                break
 
-    if len(algorithm) == 0 or len(code) == 0:
+    if len(code) == 0:
         return None
 
     return {
-        "algorithm": algorithm[0],
+        "algorithm": algorithm[0] if algorithm else "unavailable",
         "code": code[0] + " " + ", ".join(prompt_outputs),
     }
 
@@ -105,6 +111,7 @@ def reconstruct_candidate(record, prompt_outputs):
     trace = record.get("llm_trace_files") or {}
     response_files = trace.get("response_files") or []
     target_raw_hash = record.get("raw_code_sha256") or record.get("code_sha256")
+    first_parsed = None
 
     for response_file in response_files:
         if not os.path.exists(response_file):
@@ -114,11 +121,16 @@ def reconstruct_candidate(record, prompt_outputs):
         parsed = parse_response_to_code(response_text, prompt_outputs)
         if parsed is None:
             continue
+        if first_parsed is None:
+            first_parsed = dict(parsed)
+            first_parsed["response_file"] = response_file
+            first_parsed["hash_match"] = False
         if target_raw_hash is None or sha256_text(parsed["code"]) == target_raw_hash:
             parsed["response_file"] = response_file
+            parsed["hash_match"] = True
             return parsed
 
-    return None
+    return first_parsed
 
 
 def discover_candidate_records(run_dir):
