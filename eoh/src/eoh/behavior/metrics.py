@@ -2,6 +2,8 @@ import ast
 import math
 import re
 
+from .tsp_metrics import compute_tsp_behavior_metrics
+
 
 def _safe_len_lines(code_string):
     if not code_string:
@@ -78,6 +80,8 @@ def compute_structure_metrics(code_string, algorithm_summary=None):
 def null_behavior_metrics():
     return {
         "choice_trace_signature": None,
+        "raw_next_node_trace_signature": None,
+        "rank_trace_signature": None,
         "score_trace_signature": None,
         "trace_length": None,
         "unique_bins_chosen": None,
@@ -92,11 +96,22 @@ def null_behavior_metrics():
         "var_leftover_after_placement": None,
         "near_full_placement_ratio": None,
         "near_empty_placement_ratio": None,
+        "mean_chosen_rank": None,
+        "mean_chosen_rank_ratio": None,
+        "nearest_neighbor_pick_rate": None,
+        "top3_pick_rate": None,
+        "long_jump_rate": None,
+        "mean_selected_edge_length": None,
+        "var_selected_edge_length": None,
+        "mean_selected_distance_percentile": None,
+        "rank_bucket_entropy": None,
+        "early_vs_late_rank_shift": None,
+        "instance_rank_ratio_std": None,
         "traced_instance_ids": [],
     }
 
 
-def compute_behavior_metrics(traces):
+def _compute_bp_online_behavior_metrics(traces):
     metrics = null_behavior_metrics()
     if not traces:
         return metrics
@@ -127,16 +142,26 @@ def compute_behavior_metrics(traces):
     return metrics
 
 
+def compute_behavior_metrics(problem_type, traces):
+    if problem_type == "tsp_construct":
+        return compute_tsp_behavior_metrics(traces, null_behavior_metrics())
+    return _compute_bp_online_behavior_metrics(traces)
+
+
 def null_robustness_metrics():
     return {
         "permuted_order_score_drop": None,
         "permuted_order_trace_change_rate": None,
         "instance_variance_bins_used": None,
         "instance_variance_score": None,
+        "alt_start_relative_score_delta": None,
+        "alt_start_trace_change_rate": None,
+        "instance_variance_tour_length": None,
+        "instance_cv_tour_length": None,
     }
 
 
-def compute_robustness_metrics(payload):
+def compute_robustness_metrics(problem_type, payload):
     metrics = null_robustness_metrics()
     if not payload:
         return metrics
@@ -146,4 +171,3 @@ def compute_robustness_metrics(payload):
 
 def is_finite_number(value):
     return value is not None and isinstance(value, (int, float)) and math.isfinite(float(value))
-

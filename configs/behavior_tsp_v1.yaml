@@ -1,0 +1,40 @@
+enabled: true
+system_id: "S4a"
+objective_duplicate_epsilon: 1.0e-9
+
+trace:
+  traced_instance_ids:
+    - 0
+    - 1
+  traced_instance_count: 2
+  trace_prefix_steps: 48
+  alternate_start_nodes:
+    - 1
+  distance_tie_epsilon: 1.0e-12
+
+thresholds:
+  greedy_local_nearest_neighbor_rate: 0.70
+  greedy_local_mean_rank_ratio: 0.15
+  exploration_long_jump_rate: 0.20
+  exploration_mean_rank_ratio: 0.55
+  repetitive_rank_bucket_entropy: 1.0
+  repetitive_top3_rate: 0.85
+  repetitive_long_jump_rate: 0.50
+  unstable_alt_start_score_delta: 0.03
+  unstable_alt_start_trace_change_rate: 0.35
+  narrow_generalization_instance_cv: 0.08
+  robust_alt_start_score_delta: 0.01
+  robust_instance_cv: 0.03
+  extreme_distance_percentile_low: 0.10
+  extreme_distance_percentile_high: 0.90
+
+notes:
+  thresholds_version: "v1_provisional_defaults"
+  threshold_policy: "These thresholds are provisional S4a defaults for TSP behavior-aware diagnosis and should be recalibrated after real runs."
+  problem_type: "tsp_construct"
+  per_instance_outcomes_definition: "For TSP, performance.per_instance_outcomes is identical to performance.per_instance_tour_length."
+  provisional_labels:
+    - "exploration_heavy_policy"
+    - "robust_but_conservative"
+    - "edge_length_extreme_bias"
+    - "narrow_generalization"

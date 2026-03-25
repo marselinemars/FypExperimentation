@@ -4,6 +4,25 @@ import re
 from .bp_online_trace import BPOnlineTraceExtractor
 from .config import load_behavior_config
 from .heuristic_card import build_heuristic_card, finalize_generation
+from .tsp_construct_trace import TSPConstructTraceExtractor
+
+
+def _infer_problem_type(problem):
+    class_name = problem.__class__.__name__
+    if class_name == "BPONLINE":
+        return "bp_online"
+    if class_name == "TSPCONST":
+        return "tsp_construct"
+    return class_name.lower()
+
+
+def _build_trace_extractor(problem, trace_config):
+    class_name = problem.__class__.__name__
+    if class_name == "BPONLINE":
+        return BPOnlineTraceExtractor(problem, trace_config)
+    if class_name == "TSPCONST":
+        return TSPConstructTraceExtractor(problem, trace_config)
+    raise ValueError(f"Unsupported behavior-aware problem class: {class_name}")
 
 
 class BehaviorPipeline:
@@ -12,9 +31,10 @@ class BehaviorPipeline:
         self.logger = logger
         self.config = load_behavior_config(config_path)
         self.system_id = system_id or self.config.get("system_id", "S4a")
+        self.problem_type = _infer_problem_type(problem)
         self.objective_duplicate_epsilon = float(self.config.get("objective_duplicate_epsilon", 1e-9))
         self.thresholds = dict(self.config.get("thresholds") or {})
-        self.trace_extractor = BPOnlineTraceExtractor(problem, self.config.get("trace") or {})
+        self.trace_extractor = _build_trace_extractor(problem, self.config.get("trace") or {})
         self.cards_by_generation = {}
         self._finalized_generations = set()
 
@@ -31,6 +51,7 @@ class BehaviorPipeline:
         context = {
             "run_id": self.logger.run_id,
             "system_id": self.system_id,
+            "problem_type": self.problem_type,
             "generation": generation,
             "candidate_id": record.get("attempt_id"),
             "operator": record.get("operator"),
@@ -72,6 +93,7 @@ class BehaviorPipeline:
             summary = {
                 "generation": generation,
                 "candidate_count": 0,
+                "problem_type": self.problem_type,
                 "valid_candidate_count": 0,
                 "invalid_candidate_count": 0,
                 "objective_duplicate_group_count": 0,

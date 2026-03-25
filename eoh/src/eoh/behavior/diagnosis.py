@@ -1,4 +1,5 @@
 from .metrics import is_finite_number
+from .tsp_diagnosis import assign_tsp_diagnosis
 
 
 PRIMARY_LABEL_ORDER = [
@@ -42,6 +43,9 @@ def assign_diagnosis(card, thresholds, generation_context=None):
             },
             "error_type": card["diagnosis"].get("error_type"),
         }
+
+    if card["identity"].get("problem_type") == "tsp_construct":
+        return assign_tsp_diagnosis(card, thresholds, generation_context)
 
     behavior = card["behavior"]
     robustness = card["robustness"]

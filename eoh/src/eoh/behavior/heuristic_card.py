@@ -16,6 +16,19 @@ def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _behavior_duplicate_key(card):
+    problem_type = card["identity"].get("problem_type")
+    performance = card.get("performance") or {}
+    outcomes = performance.get("per_instance_outcomes") or {}
+    if not outcomes:
+        outcomes = performance.get("per_instance_bins_used") or {}
+    if problem_type == "tsp_construct":
+        trace_key = card["behavior"].get("rank_trace_signature")
+    else:
+        trace_key = card["behavior"].get("choice_trace_signature")
+    return (trace_key, tuple(sorted(outcomes.items())))
+
+
 def build_heuristic_card(context, trace_result):
     code_string = context.get("code")
     algorithm_text = context.get("algorithm")
@@ -25,6 +38,8 @@ def build_heuristic_card(context, trace_result):
         "objective": context.get("objective"),
         "per_instance_scores": {},
         "per_instance_bins_used": {},
+        "per_instance_tour_length": {},
+        "per_instance_outcomes": {},
         "valid_instance_count": 0,
         "timeout": bool(context.get("timeout", False)),
         "runtime_error": context.get("runtime_error"),
@@ -32,12 +47,16 @@ def build_heuristic_card(context, trace_result):
             "search_problem_metrics": [],
             "per_instance_scores": {},
             "per_instance_bins_used": {},
+            "per_instance_tour_length": {},
+            "per_instance_outcomes": {},
             "valid_instance_count": 0,
         },
         "traced_instance_metrics": {
             "instance_ids": [],
             "per_instance_scores": {},
             "per_instance_bins_used": {},
+            "per_instance_tour_length": {},
+            "per_instance_outcomes": {},
         },
     }
 
@@ -49,11 +68,17 @@ def build_heuristic_card(context, trace_result):
         traced = trace_result.get("traced_instance_metrics") or {}
         performance["per_instance_scores"] = dict(full_search.get("per_instance_scores") or {})
         performance["per_instance_bins_used"] = dict(full_search.get("per_instance_bins_used") or {})
+        performance["per_instance_tour_length"] = dict(full_search.get("per_instance_tour_length") or {})
+        performance["per_instance_outcomes"] = dict(
+            full_search.get("per_instance_outcomes")
+            or performance["per_instance_tour_length"]
+            or performance["per_instance_bins_used"]
+        )
         performance["valid_instance_count"] = full_search.get("valid_instance_count", 0)
         performance["full_search_metrics"] = full_search
         performance["traced_instance_metrics"] = traced
-        behavior = compute_behavior_metrics(trace_result.get("traces"))
-        robustness = compute_robustness_metrics(trace_result.get("robustness"))
+        behavior = compute_behavior_metrics(context.get("problem_type"), trace_result.get("traces"))
+        robustness = compute_robustness_metrics(context.get("problem_type"), trace_result.get("robustness"))
         raw_trace = {
             "trace_error": None,
             "traces": trace_result.get("traces") or {},
@@ -66,6 +91,7 @@ def build_heuristic_card(context, trace_result):
         "identity": {
             "run_id": context.get("run_id"),
             "system_id": context.get("system_id"),
+            "problem_type": context.get("problem_type"),
             "generation": context.get("generation"),
             "candidate_id": context.get("candidate_id"),
             "operator": context.get("operator"),
@@ -149,16 +175,16 @@ def finalize_generation(cards, thresholds, objective_duplicate_epsilon):
     objective_duplicate_count = sum(1 for card in cards if card["duplicates"]["is_objective_duplicate"])
     behavior_duplicate_count = sum(1 for card in cards if card["duplicates"]["is_behavior_duplicate"])
     unique_behavior_signatures = {
-        (
-            card["behavior"].get("choice_trace_signature"),
-            tuple(sorted((card["performance"].get("per_instance_bins_used") or {}).items())),
-        )
+        _behavior_duplicate_key(card)
         for card in valid_cards
-        if card["behavior"].get("choice_trace_signature")
+        if _behavior_duplicate_key(card)[0]
     }
+
+    problem_type = cards[0]["identity"].get("problem_type") if cards else None
 
     summary = {
         "generation": cards[0]["identity"]["generation"] if cards else None,
+        "problem_type": problem_type,
         "candidate_count": len(cards),
         "valid_candidate_count": valid_count,
         "invalid_candidate_count": len(cards) - valid_count,
@@ -175,6 +201,25 @@ def finalize_generation(cards, thresholds, objective_duplicate_epsilon):
         "objective_duplicate_epsilon": objective_duplicate_epsilon,
         "thresholds_status": "v1_provisional_defaults",
     }
+    if problem_type == "tsp_construct" and valid_cards:
+        nearest_neighbor_rates = [
+            card["behavior"].get("nearest_neighbor_pick_rate")
+            for card in valid_cards
+            if card["behavior"].get("nearest_neighbor_pick_rate") is not None
+        ]
+        chosen_rank_ratios = [
+            card["behavior"].get("mean_chosen_rank_ratio")
+            for card in valid_cards
+            if card["behavior"].get("mean_chosen_rank_ratio") is not None
+        ]
+        rank_bucket_entropies = [
+            card["behavior"].get("rank_bucket_entropy")
+            for card in valid_cards
+            if card["behavior"].get("rank_bucket_entropy") is not None
+        ]
+        summary["mean_nearest_neighbor_pick_rate"] = sum(nearest_neighbor_rates) / len(nearest_neighbor_rates) if nearest_neighbor_rates else None
+        summary["mean_chosen_rank_ratio"] = sum(chosen_rank_ratios) / len(chosen_rank_ratios) if chosen_rank_ratios else None
+        summary["mean_rank_bucket_entropy"] = sum(rank_bucket_entropies) / len(rank_bucket_entropies) if rank_bucket_entropies else None
     return cards, summary
 
 
@@ -200,10 +245,7 @@ def _group_objective_duplicates(cards, epsilon):
 def _group_behavior_duplicates(cards):
     grouped = {}
     for card in cards:
-        key = (
-            card["behavior"].get("choice_trace_signature"),
-            tuple(sorted((card["performance"].get("per_instance_bins_used") or {}).items())),
-        )
+        key = _behavior_duplicate_key(card)
         grouped.setdefault(key, []).append(card)
     return list(grouped.values())
 
