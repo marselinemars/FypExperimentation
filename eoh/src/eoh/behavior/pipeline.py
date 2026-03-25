@@ -2,7 +2,6 @@ import os
 import re
 
 from .bp_online_trace import BPOnlineTraceExtractor
-from .tsp_construct_trace import TSPConstructTraceExtractor
 from .config import load_behavior_config
 from .heuristic_card import build_heuristic_card, finalize_generation
 
@@ -15,18 +14,9 @@ class BehaviorPipeline:
         self.system_id = system_id or self.config.get("system_id", "S4a")
         self.objective_duplicate_epsilon = float(self.config.get("objective_duplicate_epsilon", 1e-9))
         self.thresholds = dict(self.config.get("thresholds") or {})
-        self.trace_extractor = self._build_trace_extractor(problem)
+        self.trace_extractor = BPOnlineTraceExtractor(problem, self.config.get("trace") or {})
         self.cards_by_generation = {}
         self._finalized_generations = set()
-
-    def _build_trace_extractor(self, problem):
-        trace_config = self.config.get("trace") or {}
-        problem_class_name = problem.__class__.__name__
-        if problem_class_name == "BPONLINE":
-            return BPOnlineTraceExtractor(problem, trace_config)
-        if problem_class_name == "TSPCONST":
-            return TSPConstructTraceExtractor(problem, trace_config)
-        raise ValueError(f"Unsupported problem for behavior pipeline: {problem_class_name}")
 
     def analyze_and_log_candidate(self, record, offspring):
         generation = record.get("population_index", 0) or 0
@@ -132,12 +122,6 @@ class BehaviorPipeline:
         code = re.findall(r"import.*return", response_text, re.DOTALL)
         if len(code) == 0:
             code = re.findall(r"def.*return", response_text, re.DOTALL)
-        if len(code) == 0:
-            fenced = re.findall(r"```(?:python)?\s*(.*?)```", response_text, re.DOTALL | re.IGNORECASE)
-            for block in fenced:
-                if "def " in block and "return" in block:
-                    code = [block.strip()]
-                    break
         if len(algorithm) == 0 and len(code) == 0:
             return None
         prompt_outputs = getattr(self.problem.prompts, "get_func_outputs", lambda: [])()

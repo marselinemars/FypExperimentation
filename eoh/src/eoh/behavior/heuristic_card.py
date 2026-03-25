@@ -16,17 +16,6 @@ def sha256_text(value):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _behavior_signature_key(card):
-    performance = card.get("performance") or {}
-    outcomes = performance.get("per_instance_outcomes") or {}
-    if not outcomes:
-        outcomes = performance.get("per_instance_bins_used") or {}
-    return (
-        card["behavior"].get("choice_trace_signature"),
-        tuple(sorted(outcomes.items())),
-    )
-
-
 def build_heuristic_card(context, trace_result):
     code_string = context.get("code")
     algorithm_text = context.get("algorithm")
@@ -36,7 +25,6 @@ def build_heuristic_card(context, trace_result):
         "objective": context.get("objective"),
         "per_instance_scores": {},
         "per_instance_bins_used": {},
-        "per_instance_outcomes": {},
         "valid_instance_count": 0,
         "timeout": bool(context.get("timeout", False)),
         "runtime_error": context.get("runtime_error"),
@@ -44,14 +32,12 @@ def build_heuristic_card(context, trace_result):
             "search_problem_metrics": [],
             "per_instance_scores": {},
             "per_instance_bins_used": {},
-            "per_instance_outcomes": {},
             "valid_instance_count": 0,
         },
         "traced_instance_metrics": {
             "instance_ids": [],
             "per_instance_scores": {},
             "per_instance_bins_used": {},
-            "per_instance_outcomes": {},
         },
     }
 
@@ -63,7 +49,6 @@ def build_heuristic_card(context, trace_result):
         traced = trace_result.get("traced_instance_metrics") or {}
         performance["per_instance_scores"] = dict(full_search.get("per_instance_scores") or {})
         performance["per_instance_bins_used"] = dict(full_search.get("per_instance_bins_used") or {})
-        performance["per_instance_outcomes"] = dict(full_search.get("per_instance_outcomes") or performance["per_instance_bins_used"])
         performance["valid_instance_count"] = full_search.get("valid_instance_count", 0)
         performance["full_search_metrics"] = full_search
         performance["traced_instance_metrics"] = traced
@@ -164,7 +149,10 @@ def finalize_generation(cards, thresholds, objective_duplicate_epsilon):
     objective_duplicate_count = sum(1 for card in cards if card["duplicates"]["is_objective_duplicate"])
     behavior_duplicate_count = sum(1 for card in cards if card["duplicates"]["is_behavior_duplicate"])
     unique_behavior_signatures = {
-        _behavior_signature_key(card)
+        (
+            card["behavior"].get("choice_trace_signature"),
+            tuple(sorted((card["performance"].get("per_instance_bins_used") or {}).items())),
+        )
         for card in valid_cards
         if card["behavior"].get("choice_trace_signature")
     }
@@ -212,6 +200,10 @@ def _group_objective_duplicates(cards, epsilon):
 def _group_behavior_duplicates(cards):
     grouped = {}
     for card in cards:
-        key = _behavior_signature_key(card)
+        key = (
+            card["behavior"].get("choice_trace_signature"),
+            tuple(sorted((card["performance"].get("per_instance_bins_used") or {}).items())),
+        )
         grouped.setdefault(key, []).append(card)
     return list(grouped.values())
+
