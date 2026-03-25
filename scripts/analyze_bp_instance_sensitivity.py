@@ -161,9 +161,14 @@ def discover_candidate_records(run_dir):
         if (card.get("identity") or {}).get("candidate_id")
     }
 
-    responses_dir = os.path.join(run_dir, "logs", "responses")
+    response_dirs = [
+        os.path.join(run_dir, "logs", "responses"),
+        os.path.join(run_dir, "behavior", "logs", "responses"),
+    ]
     response_files_by_id = {}
-    if os.path.isdir(responses_dir):
+    for responses_dir in response_dirs:
+        if not os.path.isdir(responses_dir):
+            continue
         for path in sorted(glob.glob(os.path.join(responses_dir, "*__response_*.txt"))):
             candidate_id = os.path.basename(path).split("__", 1)[0]
             if not candidate_id:
@@ -226,6 +231,7 @@ def discover_candidate_records(run_dir):
         "attempts_present": bool(attempts),
         "cards_present": bool(cards),
         "responses_present": bool(response_files_by_id),
+        "response_dirs_checked": response_dirs,
         "candidate_records": discovered,
     }
 
