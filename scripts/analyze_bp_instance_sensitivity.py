@@ -1,5 +1,6 @@
 import argparse
 import copy
+import glob
 import hashlib
 import json
 import math
@@ -103,7 +104,7 @@ def parse_response_to_code(response_text, prompt_outputs):
 def reconstruct_candidate(record, prompt_outputs):
     trace = record.get("llm_trace_files") or {}
     response_files = trace.get("response_files") or []
-    target_raw_hash = record.get("raw_code_sha256")
+    target_raw_hash = record.get("raw_code_sha256") or record.get("code_sha256")
 
     for response_file in response_files:
         if not os.path.exists(response_file):
@@ -118,6 +119,97 @@ def reconstruct_candidate(record, prompt_outputs):
             return parsed
 
     return None
+
+
+def discover_candidate_records(run_dir):
+    manifest_path = os.path.join(run_dir, "run_manifest.json")
+    manifest = load_json(manifest_path) if os.path.exists(manifest_path) else {}
+    manifest_paras = manifest.get("paras") or {}
+    default_used_numba = bool(manifest_paras.get("eva_numba_decorator"))
+
+    attempts_path = os.path.join(run_dir, "logs", "candidate_attempts.jsonl")
+    attempts = load_jsonl(attempts_path) if os.path.exists(attempts_path) else []
+    attempts_by_id = {
+        record.get("attempt_id"): record
+        for record in attempts
+        if record.get("attempt_id")
+    }
+
+    cards_dir = os.path.join(run_dir, "behavior", "cards")
+    cards = []
+    if os.path.isdir(cards_dir):
+        for path in sorted(glob.glob(os.path.join(cards_dir, "candidate_*.json"))):
+            try:
+                cards.append(load_json(path))
+            except Exception:
+                continue
+
+    discovered = []
+    seen_ids = set()
+
+    for card in cards:
+        identity = card.get("identity") or {}
+        if not identity.get("valid"):
+            continue
+        attempt_id = identity.get("candidate_id")
+        if not attempt_id or attempt_id in seen_ids:
+            continue
+        attempt = attempts_by_id.get(attempt_id) or {}
+        response_files = (
+            ((attempt.get("llm_trace_files") or {}).get("response_files"))
+            or sorted(glob.glob(os.path.join(run_dir, "logs", "responses", f"{attempt_id}__*__response_*.txt")))
+        )
+        discovered.append(
+            {
+                "attempt_id": attempt_id,
+                "operator": identity.get("operator") or attempt.get("operator"),
+                "objective": identity.get("objective") if identity.get("objective") is not None else attempt.get("objective"),
+                "code_sha256": identity.get("code_hash") or attempt.get("code_sha256"),
+                "raw_code_sha256": attempt.get("raw_code_sha256") or identity.get("code_hash"),
+                "used_numba": attempt.get("used_numba", default_used_numba),
+                "status": "valid",
+                "llm_trace_files": {
+                    "response_files": response_files,
+                },
+                "source": "behavior_card",
+            }
+        )
+        seen_ids.add(attempt_id)
+
+    if not discovered:
+        for attempt in attempts:
+            if attempt.get("status") != "valid":
+                continue
+            attempt_id = attempt.get("attempt_id")
+            if not attempt_id or attempt_id in seen_ids:
+                continue
+            response_files = (
+                ((attempt.get("llm_trace_files") or {}).get("response_files"))
+                or sorted(glob.glob(os.path.join(run_dir, "logs", "responses", f"{attempt_id}__*__response_*.txt")))
+            )
+            discovered.append(
+                {
+                    "attempt_id": attempt_id,
+                    "operator": attempt.get("operator"),
+                    "objective": attempt.get("objective"),
+                    "code_sha256": attempt.get("code_sha256"),
+                    "raw_code_sha256": attempt.get("raw_code_sha256") or attempt.get("code_sha256"),
+                    "used_numba": attempt.get("used_numba", default_used_numba),
+                    "status": attempt.get("status"),
+                    "llm_trace_files": {
+                        "response_files": response_files,
+                    },
+                    "source": "candidate_attempt",
+                }
+            )
+            seen_ids.add(attempt_id)
+
+    return {
+        "manifest": manifest,
+        "attempts_present": bool(attempts),
+        "cards_present": bool(cards),
+        "candidate_records": discovered,
+    }
 
 
 def build_evaluation_code(code, use_numba):
@@ -466,21 +558,27 @@ def main():
     args = parser.parse_args()
 
     run_dir = os.path.abspath(args.run_dir) if args.run_dir else latest_run_dir(os.path.join(REPO_ROOT, "runs"))
-    attempts_path = os.path.join(run_dir, "logs", "candidate_attempts.jsonl")
     output_dir = os.path.join(run_dir, "analysis")
     os.makedirs(output_dir, exist_ok=True)
     json_output_path = os.path.join(output_dir, "bp_instance_sensitivity.json")
     md_output_path = os.path.join(output_dir, "bp_instance_sensitivity.md")
 
-    attempts = load_jsonl(attempts_path)
+    discovery = discover_candidate_records(run_dir)
+    candidate_records = discovery["candidate_records"]
+    if not candidate_records:
+        raise FileNotFoundError(
+            "No analyzable valid candidates found. Expected either behavior cards under "
+            f"'{os.path.join(run_dir, 'behavior', 'cards')}' or valid candidate records under "
+            f"'{os.path.join(run_dir, 'logs', 'candidate_attempts.jsonl')}'."
+        )
+
     base_problem = BPONLINE()
     prompt_outputs = base_problem.prompts.get_func_outputs()
     dataset_name, dataset = next(iter(base_problem.instances.items()))
 
-    valid_attempts = [record for record in attempts if record.get("status") == "valid"]
     unique_candidates = []
     seen_code_hashes = set()
-    for record in valid_attempts:
+    for record in candidate_records:
         code_hash = record.get("code_sha256")
         if code_hash in seen_code_hashes:
             continue
@@ -573,6 +671,12 @@ def main():
         "generated_at_utc": utc_now_iso(),
         "run_dir": run_dir,
         "dataset_name": dataset_name,
+        "candidate_discovery": {
+            "used_behavior_cards": discovery["cards_present"],
+            "used_candidate_attempts": discovery["attempts_present"],
+            "candidate_record_count": len(candidate_records),
+            "candidate_sources": sorted({record.get("source") for record in candidate_records}),
+        },
         "analyzed_candidate_count": len(candidate_modules),
         "requested_max_candidates": args.max_candidates,
         "trace_steps": args.trace_steps,
