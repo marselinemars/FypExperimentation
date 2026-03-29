@@ -55,6 +55,7 @@ def resolve_llm_settings(llm_config, strict=True):
         "llm_api_key": _env_first("GROQ_API_KEY", "API_KEY", "EOH_LLM_API_KEY") or llm_config.get("api_key"),
         "llm_model": _env_first("EOH_MODEL", "EOH_LLM_MODEL") or llm_config.get("model"),
         "llm_api_timeout": _env_int("EOH_API_TIMEOUT") or llm_config.get("timeout_seconds"),
+        "llm_reasoning_mode": _env_first("EOH_REASONING_MODE") or llm_config.get("reasoning_mode", "none"),
     }
 
     if strict and not use_local:
@@ -289,6 +290,7 @@ def main():
                 "llm_api_endpoint": paras.llm_api_endpoint,
                 "llm_model": paras.llm_model,
                 "llm_api_timeout": paras.llm_api_timeout,
+                "llm_reasoning_mode": paras.llm_reasoning_mode,
                 "parallel_workers": paras.exp_n_proc,
                 "population_size": paras.ec_pop_size,
                 "n_populations": paras.ec_n_pop,

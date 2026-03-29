@@ -31,6 +31,7 @@ class Evolution():
         self.api_key = api_key
         self.model_LLM = model_LLM
         self.debug_mode = debug_mode # close prompt checking
+        self.reasoning_mode = kwargs.get("reasoning_mode", "none") or "none"
 
 
         self.interface_llm = InterfaceLLM(
@@ -42,6 +43,55 @@ class Evolution():
             self.debug_mode,
             api_timeout=kwargs.get("api_timeout"),
         )
+
+    def _maybe_wrap_reasoning_prompt(self, prompt_content, operator_name):
+        if self.reasoning_mode in [None, "", "none"]:
+            return prompt_content
+        if self.reasoning_mode != "react_v1":
+            return prompt_content
+
+        reasoning_header = (
+            "Use a short reasoning-and-acting workflow before the final answer.\n"
+            "Required response format:\n"
+            "Reasoning:\n"
+            "- briefly analyze the task objective, constraints, and likely failure modes\n"
+            "Action:\n"
+            "- state the concrete design move you will take for this operator\n"
+            "{one-sentence algorithm description}\n"
+            "```python\n"
+            "# final Python code only\n"
+            "```\n"
+            "Rules:\n"
+            "- keep the reasoning concise\n"
+            "- the braces description must still be present\n"
+            "- the final code must be a single valid Python function for the requested function name\n"
+            "- do not include explanations after the code block\n"
+            f"- current operator: {operator_name}\n"
+        )
+        return prompt_content + "\n" + reasoning_header
+
+    def _extract_algorithm(self, response):
+        algorithm = re.findall(r"\{(.*)\}", response, re.DOTALL)
+        if len(algorithm) == 0:
+            if 'python' in response:
+                algorithm = re.findall(r'^.*?(?=```python|python)', response,re.DOTALL)
+            elif 'import' in response:
+                algorithm = re.findall(r'^.*?(?=import)', response,re.DOTALL)
+            else:
+                algorithm = re.findall(r'^.*?(?=def)', response,re.DOTALL)
+        return algorithm
+
+    def _extract_code(self, response):
+        fenced = re.findall(r"```python\s*(.*?)```", response, re.DOTALL | re.IGNORECASE)
+        if len(fenced) == 0:
+            fenced = re.findall(r"```\s*(.*?)```", response, re.DOTALL)
+        if fenced:
+            return fenced
+
+        code = re.findall(r"import.*return", response, re.DOTALL)
+        if len(code) == 0:
+            code = re.findall(r"def.*return", response, re.DOTALL)
+        return code
 
     def get_prompt_i1(self):
         
@@ -135,23 +185,14 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             "responses": [],
             "parse_success": False,
             "parse_error": None,
+            "reasoning_mode": self.reasoning_mode,
         }
 
         response = self.interface_llm.get_response(prompt_content)
         trace["responses"].append(response)
 
-        algorithm = re.findall(r"\{(.*)\}", response, re.DOTALL)
-        if len(algorithm) == 0:
-            if 'python' in response:
-                algorithm = re.findall(r'^.*?(?=python)', response,re.DOTALL)
-            elif 'import' in response:
-                algorithm = re.findall(r'^.*?(?=import)', response,re.DOTALL)
-            else:
-                algorithm = re.findall(r'^.*?(?=def)', response,re.DOTALL)
-
-        code = re.findall(r"import.*return", response, re.DOTALL)
-        if len(code) == 0:
-            code = re.findall(r"def.*return", response, re.DOTALL)
+        algorithm = self._extract_algorithm(response)
+        code = self._extract_code(response)
 
         n_retry = 1
         while (len(algorithm) == 0 or len(code) == 0):
@@ -161,18 +202,8 @@ Finally, provide the revised code, keeping the function name, inputs, and output
             response = self.interface_llm.get_response(prompt_content)
             trace["responses"].append(response)
 
-            algorithm = re.findall(r"\{(.*)\}", response, re.DOTALL)
-            if len(algorithm) == 0:
-                if 'python' in response:
-                    algorithm = re.findall(r'^.*?(?=python)', response,re.DOTALL)
-                elif 'import' in response:
-                    algorithm = re.findall(r'^.*?(?=import)', response,re.DOTALL)
-                else:
-                    algorithm = re.findall(r'^.*?(?=def)', response,re.DOTALL)
-
-            code = re.findall(r"import.*return", response, re.DOTALL)
-            if len(code) == 0:
-                code = re.findall(r"def.*return", response, re.DOTALL)
+            algorithm = self._extract_algorithm(response)
+            code = self._extract_code(response)
                 
             if n_retry > 3:
                 break
@@ -193,7 +224,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
 
     def i1(self):
 
-        prompt_content = self.get_prompt_i1()
+        prompt_content = self._maybe_wrap_reasoning_prompt(self.get_prompt_i1(), "i1")
 
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ i1 ] : \n", prompt_content )
@@ -212,7 +243,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
     
     def e1(self,parents):
       
-        prompt_content = self.get_prompt_e1(parents)
+        prompt_content = self._maybe_wrap_reasoning_prompt(self.get_prompt_e1(parents), "e1")
 
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ e1 ] : \n", prompt_content )
@@ -231,7 +262,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
     
     def e2(self,parents):
       
-        prompt_content = self.get_prompt_e2(parents)
+        prompt_content = self._maybe_wrap_reasoning_prompt(self.get_prompt_e2(parents), "e2")
 
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ e2 ] : \n", prompt_content )
@@ -250,7 +281,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
     
     def m1(self,parents):
       
-        prompt_content = self.get_prompt_m1(parents)
+        prompt_content = self._maybe_wrap_reasoning_prompt(self.get_prompt_m1(parents), "m1")
 
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ m1 ] : \n", prompt_content )
@@ -269,7 +300,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
     
     def m2(self,parents):
       
-        prompt_content = self.get_prompt_m2(parents)
+        prompt_content = self._maybe_wrap_reasoning_prompt(self.get_prompt_m2(parents), "m2")
 
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ m2 ] : \n", prompt_content )
@@ -288,7 +319,7 @@ Finally, provide the revised code, keeping the function name, inputs, and output
     
     def m3(self,parents):
       
-        prompt_content = self.get_prompt_m3(parents)
+        prompt_content = self._maybe_wrap_reasoning_prompt(self.get_prompt_m3(parents), "m3")
 
         if self.debug_mode:
             print("\n >>> check prompt for creating algorithm using [ m3 ] : \n", prompt_content )

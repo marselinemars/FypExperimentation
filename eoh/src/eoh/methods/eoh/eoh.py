@@ -21,6 +21,8 @@ class EOH:
         self.api_endpoint = paras.llm_api_endpoint  # currently only API2D + GPT
         self.api_key = paras.llm_api_key
         self.llm_model = paras.llm_model
+        self.llm_api_timeout = paras.llm_api_timeout
+        self.llm_reasoning_mode = getattr(paras, "llm_reasoning_mode", "none")
 
         # ------------------ RZ: use local LLM ------------------
         # self.use_local_llm = kwargs.get('use_local_llm', False)
@@ -115,6 +117,8 @@ class EOH:
                                    self.debug_mode, interface_prob, select=self.select,n_p=self.exp_n_proc,
                                    logger=self.logger,
                                    timeout = self.timeout, use_numba=self.use_numba,
+                                   api_timeout=self.llm_api_timeout,
+                                   reasoning_mode=self.llm_reasoning_mode,
                                    worker_seed_base=self.worker_seed,
                                    behavior_enabled=getattr(self, "behavior_enabled", False),
                                    behavior_config_path=getattr(self, "behavior_config_path", None),

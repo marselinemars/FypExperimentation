@@ -27,6 +27,7 @@ class Paras():
         self.llm_api_key = None  # API key for remote LLM, e.g., sk-xxxx
         self.llm_model = None  # model type for remote LLM, e.g., deepseek-chat
         self.llm_api_timeout = 120  # request timeout in seconds for remote OpenAI-compatible providers
+        self.llm_reasoning_mode = "none"  # optional experimental prompt mode for explicit reasoning/action traces
 
         #####################
         ###  Exp settings  ###
