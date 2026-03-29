@@ -2,13 +2,14 @@ from ..llm.api_general import InterfaceAPI
 from ..llm.api_local_llm import InterfaceLocalLLM
 
 class InterfaceLLM:
-    def __init__(self, api_endpoint, api_key, model_LLM,llm_use_local,llm_local_url, debug_mode):
+    def __init__(self, api_endpoint, api_key, model_LLM,llm_use_local,llm_local_url, debug_mode, api_timeout=None):
         self.api_endpoint = api_endpoint
         self.api_key = api_key
         self.model_LLM = model_LLM
         self.debug_mode = debug_mode
         self.llm_use_local = llm_use_local
         self.llm_local_url = llm_local_url
+        self.api_timeout = api_timeout
 
         print("- check LLM API")
 
@@ -35,6 +36,7 @@ class InterfaceLLM:
                 self.api_key,
                 self.model_LLM,
                 self.debug_mode,
+                timeout_seconds=self.api_timeout,
             )
 
             

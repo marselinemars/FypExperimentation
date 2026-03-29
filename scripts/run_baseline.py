@@ -26,6 +26,21 @@ def resolve_repo_path(path_value):
     return os.path.abspath(os.path.join(REPO_ROOT, path_value))
 
 
+def _env_first(*names):
+    for name in names:
+        value = os.environ.get(name)
+        if value not in [None, ""]:
+            return value
+    return None
+
+
+def _env_int(*names):
+    value = _env_first(*names)
+    if value in [None, ""]:
+        return None
+    return int(value)
+
+
 def load_config(config_path):
     with open(config_path, "r", encoding="utf-8") as file:
         return yaml.safe_load(file)
@@ -35,10 +50,11 @@ def resolve_llm_settings(llm_config, strict=True):
     use_local = bool(llm_config.get("use_local", False))
     settings = {
         "llm_use_local": use_local,
-        "llm_local_url": os.environ.get("EOH_LLM_LOCAL_URL", llm_config.get("local_url")),
-        "llm_api_endpoint": os.environ.get("EOH_LLM_API_ENDPOINT", llm_config.get("api_endpoint")),
-        "llm_api_key": os.environ.get("EOH_LLM_API_KEY", llm_config.get("api_key")),
-        "llm_model": os.environ.get("EOH_LLM_MODEL", llm_config.get("model")),
+        "llm_local_url": _env_first("EOH_LLM_LOCAL_URL") or llm_config.get("local_url"),
+        "llm_api_endpoint": _env_first("EOH_API_ENDPOINT", "EOH_LLM_API_ENDPOINT") or llm_config.get("api_endpoint"),
+        "llm_api_key": _env_first("GROQ_API_KEY", "API_KEY", "EOH_LLM_API_KEY") or llm_config.get("api_key"),
+        "llm_model": _env_first("EOH_MODEL", "EOH_LLM_MODEL") or llm_config.get("model"),
+        "llm_api_timeout": _env_int("EOH_API_TIMEOUT") or llm_config.get("timeout_seconds"),
     }
 
     if strict and not use_local:
@@ -69,17 +85,22 @@ def build_paras(config, config_path, strict_llm=True):
     llm_settings = resolve_llm_settings(config.get("llm", {}), strict=strict_llm)
 
     paras = Paras()
+    population_size = _env_int("EOH_POP_SIZE") or search.get("population_size")
+    n_populations = _env_int("EOH_N_POP") or search.get("n_populations")
+    parallel_workers = _env_int("EOH_N_PROC") or search.get("parallel_workers")
+    evaluation_timeout = _env_int("EOH_EVAL_TIMEOUT")
+
     paras.set_paras(
         method=search.get("method"),
         problem=problem.get("name"),
         selection=search.get("selection"),
         management=search.get("management"),
-        ec_pop_size=search.get("population_size"),
-        ec_n_pop=search.get("n_populations"),
+        ec_pop_size=population_size,
+        ec_n_pop=n_populations,
         ec_m=search.get("n_parents_e1_e2"),
         ec_operators=search.get("operators"),
         ec_operator_weights=search.get("operator_weights"),
-        exp_n_proc=search.get("parallel_workers"),
+        exp_n_proc=parallel_workers,
         exp_debug_mode=search.get("debug_mode", False),
         exp_output_path=resolve_repo_path(artifacts.get("output_root", ".")),
         exp_seed=reproducibility.get("global_seed"),
@@ -89,7 +110,9 @@ def build_paras(config, config_path, strict_llm=True):
         **llm_settings,
     )
 
-    if "timeout_seconds" in evaluation:
+    if evaluation_timeout is not None:
+        paras.eva_timeout = evaluation_timeout
+    elif "timeout_seconds" in evaluation:
         paras.eva_timeout = evaluation["timeout_seconds"]
     if "use_numba_decorator" in evaluation:
         paras.eva_numba_decorator = evaluation["use_numba_decorator"]
@@ -265,6 +288,11 @@ def main():
                 "llm_use_local": paras.llm_use_local,
                 "llm_api_endpoint": paras.llm_api_endpoint,
                 "llm_model": paras.llm_model,
+                "llm_api_timeout": paras.llm_api_timeout,
+                "parallel_workers": paras.exp_n_proc,
+                "population_size": paras.ec_pop_size,
+                "n_populations": paras.ec_n_pop,
+                "evaluation_timeout": paras.eva_timeout,
                 "behavior_enabled": paras.exp_behavior_enabled,
                 "behavior_config_path": paras.exp_behavior_config_path,
             },

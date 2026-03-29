@@ -33,7 +33,15 @@ class Evolution():
         self.debug_mode = debug_mode # close prompt checking
 
 
-        self.interface_llm = InterfaceLLM(self.api_endpoint, self.api_key, self.model_LLM,llm_use_local,llm_local_url, self.debug_mode)
+        self.interface_llm = InterfaceLLM(
+            self.api_endpoint,
+            self.api_key,
+            self.model_LLM,
+            llm_use_local,
+            llm_local_url,
+            self.debug_mode,
+            api_timeout=kwargs.get("api_timeout"),
+        )
 
     def get_prompt_i1(self):
         

@@ -26,6 +26,7 @@ class Paras():
         self.llm_api_endpoint = None # endpoint for remote LLM, e.g., api.deepseek.com
         self.llm_api_key = None  # API key for remote LLM, e.g., sk-xxxx
         self.llm_model = None  # model type for remote LLM, e.g., deepseek-chat
+        self.llm_api_timeout = 120  # request timeout in seconds for remote OpenAI-compatible providers
 
         #####################
         ###  Exp settings  ###

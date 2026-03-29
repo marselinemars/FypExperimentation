@@ -1,0 +1,80 @@
+baseline:
+  name: "S4a_validation_tsp_construct_groq"
+  status: "provider_switch_validation_only_not_for_final_results"
+  upstream_repo: "https://github.com/FeiLiu36/EoH.git"
+  upstream_commit: "492782aefe03bade9eba621d0a43f5652c7c7202"
+  local_repo_root: "C:/Users/pc omen/Documents/experimentation/EoH"
+
+problem:
+  name: "tsp_construct"
+  search_evaluator: "eoh/src/eoh/problems/optimization/tsp_greedy/run.py"
+  search_dataset_source: "eoh/src/eoh/problems/optimization/tsp_greedy/get_instance.py"
+  prompts: "eoh/src/eoh/problems/optimization/tsp_greedy/prompts.py"
+  posthoc_eval_script: "examples/tsp_construct/evaluation/runEval.py"
+
+launcher:
+  current_entry_script: "examples/tsp_construct/runEoH.py"
+  planned_unified_runner: "scripts/run_baseline.py"
+
+search:
+  method: "eoh"
+  selection: "prob_rank"
+  management: "pop_greedy"
+  population_size: 2
+  n_populations: 2
+  n_parents_e1_e2: 2
+  operators:
+    - "e1"
+    - "e2"
+    - "m1"
+    - "m2"
+  operator_weights:
+    - 1
+    - 1
+    - 1
+    - 1
+  parallel_workers: 1
+  debug_mode: false
+
+evaluation:
+  timeout_seconds: 250
+  use_numba_decorator: false
+  search_objective: "Groq-backed Phase 1 TSP validation-only run for S4a artifact generation"
+  invalid_candidate_definition:
+    - "LLM response cannot be parsed into algorithm and code"
+    - "generated code raises during exec"
+    - "generated code raises during evaluation"
+    - "evaluation returns None"
+
+llm:
+  use_local: false
+  api_endpoint: "https://api.groq.com/openai/v1"
+  api_key: "SET_VIA_ENV_GROQ_API_KEY"
+  model: "llama-3.3-70b-versatile"
+  timeout_seconds: 250
+  sampling:
+    temperature: "BACKEND_DEFAULT_OR_UNEXPOSED"
+    top_p: "BACKEND_DEFAULT_OR_UNEXPOSED"
+    seed: "BACKEND_DEFAULT_OR_UNEXPOSED"
+
+reproducibility:
+  mode: "seeded_controlled_s4a_tsp_validation_groq"
+  global_seed: 2024
+  python_seed: 2024
+  numpy_seed: 2024
+  worker_seed_base: 2024
+  worker_seed_strategy: "deterministic_per_attempt_context_hash"
+
+behavior:
+  enabled: true
+  system_id: "S4a"
+  config_path: "configs/behavior_tsp_v1.yaml"
+
+artifacts:
+  output_root: "./"
+
+notes:
+  - "This config is dedicated to Groq-backed TSP S4a validation runs."
+  - "Safe defaults are intentionally conservative to avoid provider-side latency and timeout issues."
+  - "Env overrides supported: GROQ_API_KEY/API_KEY, EOH_API_ENDPOINT, EOH_MODEL, EOH_API_TIMEOUT, EOH_EVAL_TIMEOUT, EOH_N_PROC, EOH_POP_SIZE, EOH_N_POP."
+  - "Recommended starting model: llama-3.3-70b-versatile. Optional faster test model: qwen/qwen3-32b."

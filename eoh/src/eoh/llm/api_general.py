@@ -4,12 +4,13 @@ from urllib.parse import urlparse
 
 
 class InterfaceAPI:
-    def __init__(self, api_endpoint, api_key, model_LLM, debug_mode):
+    def __init__(self, api_endpoint, api_key, model_LLM, debug_mode, timeout_seconds=None):
         self.api_endpoint = api_endpoint
         self.api_key = api_key
         self.model_LLM = model_LLM
         self.debug_mode = debug_mode
         self.n_trial = 5
+        self.timeout_seconds = timeout_seconds
         self.connection_class, self.connection_host, self.request_path = self._resolve_endpoint(api_endpoint)
 
     def _resolve_endpoint(self, api_endpoint):
@@ -55,14 +56,14 @@ class InterfaceAPI:
             if n_trial > self.n_trial:
                 return response
             try:
-                conn = self.connection_class(self.connection_host)
+                conn = self.connection_class(self.connection_host, timeout=self.timeout_seconds)
                 conn.request("POST", self.request_path, payload_explanation, headers)
                 res = conn.getresponse()
                 data = res.read()
                 json_data = json.loads(data)
                 response = json_data["choices"][0]["message"]["content"]
                 break
-            except:
+            except Exception:
                 if self.debug_mode:
                     print("Error in API. Restarting the process...")
                 continue
